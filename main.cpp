@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include "backend/gameboard.h"
+#include "backend/hardwareserver.h" // Nhúng thư viện Server
 
 int main(int argc, char *argv[])
 {
@@ -12,6 +13,9 @@ int main(int argc, char *argv[])
     GameBoard board;
     engine.rootContext()->setContextProperty("gameBoard", &board);
 
+    // BẬT SERVER MẠNG VÀ TRUYỀN CON TRỞ BOARD VÀO
+    HardwareServer hwServer(&board);
+
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
@@ -19,6 +23,6 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
-    engine.loadFromModule("DigitCode_QT", "Main");
+    engine.loadFromModule("DigitCode_SINGLE", "Main");
     return app.exec();
 }
