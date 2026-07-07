@@ -45,6 +45,10 @@ public:
     // --- 3. CỔNG GIAO TIẾP GƯƠNG 2 CHIỀU (XỬ LÝ LUẬT GAME) ---
     Q_INVOKABLE void handleButtonPress(const QString& source, const QString& btnId);
 
+    Q_INVOKABLE void pauseGame();
+    Q_INVOKABLE void resumeGame();
+    Q_INVOKABLE void verifyCode(const QString& guessCode);
+
     // Các hàm hệ thống
     Q_INVOKABLE void generateRandomPuzzle();
     Q_INVOKABLE QVariantList getSegState(int ledIdx) const;
@@ -68,6 +72,8 @@ signals:
 
     void playTimeSecondsChanged();
     void gameWon();
+    void gameLost();
+    void wrongGuessWarning();
 
 private slots:
     void onPenaltyTimeout(); // Hàm gọi khi quá 10s chần chừ
@@ -107,6 +113,7 @@ private:
     QTimer* m_globalTimer;    // Đồng hồ tổng (Không bao giờ stop)
     QTimer* m_oledClearTimer;
     int m_playTimeSeconds;    // Lưu tổng số giây đã chơi thực tế
+    int m_guessCount;         // Đếm số lần đoán sai
 
     // --- BIẾN LƯU VẾT & CHỐNG TRÙNG LẶP ---
     QString m_tempTarget1;

@@ -101,12 +101,35 @@ void GameBoard::onGlobalTimerTick() {
         m_points -= 1;
         emit pointsChanged(); // Báo cho giao diện QML và OLED cập nhật ngay lập tức
     }
+
+    // LOGIC GAME OVER: Chết khi cạn điểm
+    if (m_points <= 0) {
+        m_points = 0; // Tránh điểm âm
+        emit pointsChanged();
+
+        m_globalTimer->stop();
+        if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
+        if (m_oledClearTimer->isActive()) m_oledClearTimer->stop();
+
+        emit oledUpdateRequested("YOU DIED...", "Better luck next life");
+        emit gameLost(); // Bắn tín hiệu sang QML
+    }
 }
 
 // --- LOGIC PHẠT TIMER 5 GIÂY ---
 void GameBoard::onPenaltyTimeout() {
     m_points -= 1;
     emit pointsChanged();
+
+    // LOGIC GAME OVER TRONG LÚC BỊ PHẠT
+    if (m_points <= 0) {
+        m_points = 0;
+        emit pointsChanged();
+        m_globalTimer->stop();
+        emit oledUpdateRequested("YOU DIED...", "Better luck next life");
+        emit gameLost();
+        return; // Kết thúc hàm luôn, không chạy đoạn set trạng thái DEFAULT ở dưới nữa
+    }
 
     emit oledUpdateRequested("Playing with me?", "-1 Point");
     m_oledClearTimer->start(3000);
@@ -372,6 +395,7 @@ void GameBoard::lockAndLightUpFull(const QString& btnId) {
 
 void GameBoard::generateRandomPuzzle() {
     // 1. DỌN DẸP TRẠNG THÁI HỆ THỐNG KHI TẠO ĐỀ MỚI
+    m_guessCount = 0;
     m_playTimeSeconds = 0;
     emit playTimeSecondsChanged();
     m_points = 100;
@@ -385,6 +409,12 @@ void GameBoard::generateRandomPuzzle() {
     m_askedQ4.clear();
     m_lockedFull.clear();
     m_lockedSegments.clear();
+
+    for (int i = 0; i < 6; i++) {
+        m_segStates[i] = QVariantList({0, 0, 0, 0, 0, 0, 0});
+        emit segStateUpdated(i, m_segStates[i].toList()); // Báo xuống ESP32
+    }
+    emit segStatesChanged(); // Báo cho QML cập nhật UI
 
     if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
 
@@ -546,8 +576,8 @@ void GameBoard::processQ4(const QString& btnId) {
             revealClueToUI("Q4_FULL", node, isFull);
 
             // Trả về text tương ứng cho OLED
-            return isFull ? QString("%1 danger, FULL demon(s)").arg(node)
-                          : QString("%1 clear, NO demon").arg(node);
+            return isFull ? QString("%1 FULL").arg(node)
+                          : QString("%1 NOT FULL").arg(node);
         };
 
         // Thực thi kiểm tra cho cả 2 nút
@@ -568,7 +598,7 @@ void GameBoard::processReview(const QString& btnId) {
     // Phân cấp thứ tự ưu tiên của Review Mode (Không trừ điểm, không dùng Timer)
     if (m_lockedFull.contains(btnId)) {
         // Đã khóa do FULL (ưu tiên cao nhất)
-        emit oledUpdateRequested(QString("%1 danger, FULL demon(s)").arg(btnId), "");
+        emit oledUpdateRequested(QString("%1 FULL").arg(btnId), "");
         m_oledClearTimer->start(3000);
     }
     else if (m_askedQ3.contains(btnId)) {
@@ -652,4 +682,52 @@ QVariantList GameBoard::getSegState(int ledIdx) const {
     QVariantList result = m_segStates[ledIdx].toList();
     if (result.size() != 7) return QVariantList({0,0,0,0,0,0,0});
     return result;
+}
+
+void GameBoard::pauseGame() {
+    // Đóng băng toàn bộ đồng hồ
+    if (m_globalTimer->isActive()) m_globalTimer->stop();
+    if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
+}
+
+void GameBoard::resumeGame() {
+    // Chỉ tiếp tục chạy lại khi điểm vẫn còn và game chưa kết thúc
+    if (m_points > 0 && !m_secretCode.isEmpty()) {
+        m_globalTimer->start(1000);
+    }
+}
+
+void GameBoard::verifyCode(const QString& guessCode) {
+    if (guessCode == m_secretCode) {
+        // ĐOÁN ĐÚNG -> KÍCH HOẠT CHIẾN THẮNG
+        m_globalTimer->stop();
+        if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
+        if (m_oledClearTimer->isActive()) m_oledClearTimer->stop();
+        m_secretCode = "";
+
+        int m = m_playTimeSeconds / 60;
+        int s = m_playTimeSeconds % 60;
+        QString timeStr = QString("%1:%2").arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
+        emit oledUpdateRequested("YOU ESCAPED!", "Clear time: " + timeStr);
+        emit gameWon();
+    } else {
+        // ĐOÁN SAI -> TĂNG BIẾN ĐẾM
+        m_guessCount++;
+
+        if (m_guessCount >= 2) {
+            // SAI LẦN 2 -> GAME OVER
+            m_points = 0;
+            emit pointsChanged();
+
+            m_globalTimer->stop();
+            if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
+            if (m_oledClearTimer->isActive()) m_oledClearTimer->stop();
+
+            emit oledUpdateRequested("ACCESS DENIED...", "System Locked");
+            emit gameLost();
+        } else {
+            // SAI LẦN 1 -> GỬI TÍN HIỆU CẢNH BÁO (Bật Popup QML)
+            emit wrongGuessWarning();
+        }
+    }
 }

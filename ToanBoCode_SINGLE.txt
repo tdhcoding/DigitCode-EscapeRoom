@@ -15,7 +15,12 @@ qt_add_qml_module(appDigitCode_SINGLE
     URI DigitCode_SINGLE
     VERSION 1.0
     QML_FILES
-        UI/Main.qml
+        UI/Main.qml             # Sẽ làm bộ khung StackView
+        UI/ScreenMenu.qml       # Màn hình chính
+        UI/ScreenReady.qml      # Màn hình chuẩn bị
+        UI/ScreenGame.qml       # File Main.qml cũ đổi tên thành file này
+        UI/ScreenResult.qml     # Màn hình Thắng/Thua
+
         UI/LedDisplay.qml
         UI/LogicButton.qml
         UI/CounterBox.qml
@@ -119,6 +124,9 @@ public:
     // --- 3. CỔNG GIAO TIẾP GƯƠNG 2 CHIỀU (XỬ LÝ LUẬT GAME) ---
     Q_INVOKABLE void handleButtonPress(const QString& source, const QString& btnId);
 
+    Q_INVOKABLE void pauseGame();
+    Q_INVOKABLE void resumeGame();
+
     // Các hàm hệ thống
     Q_INVOKABLE void generateRandomPuzzle();
     Q_INVOKABLE QVariantList getSegState(int ledIdx) const;
@@ -142,6 +150,7 @@ signals:
 
     void playTimeSecondsChanged();
     void gameWon();
+    void gameLost();
 
 private slots:
     void onPenaltyTimeout(); // Hàm gọi khi quá 10s chần chừ
@@ -328,12 +337,35 @@ void GameBoard::onGlobalTimerTick() {
         m_points -= 1;
         emit pointsChanged(); // Báo cho giao diện QML và OLED cập nhật ngay lập tức
     }
+
+    // LOGIC GAME OVER: Chết khi cạn điểm
+    if (m_points <= 0) {
+        m_points = 0; // Tránh điểm âm
+        emit pointsChanged();
+
+        m_globalTimer->stop();
+        if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
+        if (m_oledClearTimer->isActive()) m_oledClearTimer->stop();
+
+        emit oledUpdateRequested("YOU DIED...", "Better luck next life");
+        emit gameLost(); // Bắn tín hiệu sang QML
+    }
 }
 
 // --- LOGIC PHẠT TIMER 5 GIÂY ---
 void GameBoard::onPenaltyTimeout() {
     m_points -= 1;
     emit pointsChanged();
+
+    // LOGIC GAME OVER TRONG LÚC BỊ PHẠT
+    if (m_points <= 0) {
+        m_points = 0;
+        emit pointsChanged();
+        m_globalTimer->stop();
+        emit oledUpdateRequested("YOU DIED...", "Better luck next life");
+        emit gameLost();
+        return; // Kết thúc hàm luôn, không chạy đoạn set trạng thái DEFAULT ở dưới nữa
+    }
 
     emit oledUpdateRequested("Playing with me?", "-1 Point");
     m_oledClearTimer->start(3000);
@@ -613,6 +645,12 @@ void GameBoard::generateRandomPuzzle() {
     m_lockedFull.clear();
     m_lockedSegments.clear();
 
+    for (int i = 0; i < 6; i++) {
+        m_segStates[i] = QVariantList({0, 0, 0, 0, 0, 0, 0});
+        emit segStateUpdated(i, m_segStates[i].toList()); // Báo xuống ESP32
+    }
+    emit segStatesChanged(); // Báo cho QML cập nhật UI
+
     if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
 
     m_globalTimer->start(1000);
@@ -879,6 +917,19 @@ QVariantList GameBoard::getSegState(int ledIdx) const {
     QVariantList result = m_segStates[ledIdx].toList();
     if (result.size() != 7) return QVariantList({0,0,0,0,0,0,0});
     return result;
+}
+
+void GameBoard::pauseGame() {
+    // Đóng băng toàn bộ đồng hồ
+    if (m_globalTimer->isActive()) m_globalTimer->stop();
+    if (m_penaltyTimer->isActive()) m_penaltyTimer->stop();
+}
+
+void GameBoard::resumeGame() {
+    // Chỉ tiếp tục chạy lại khi điểm vẫn còn và game chưa kết thúc
+    if (m_points > 0 && !m_secretCode.isEmpty()) {
+        m_globalTimer->start(1000);
+    }
 }#include "hardwareserver.h"
 #include <QDebug>
 #include <QJsonArray>
@@ -1009,678 +1060,120 @@ import QtQuick.Controls
 Item {
     id: root
 
-    readonly property var rowBtn1Names: ["J","K","L","M","N"]
-    readonly property var rowBtn2Names: ["O","P","Q","R","S"]
-    readonly property var rowBtnY: [-7, 15, 36, 57, 79]
-    readonly property real boardScale: 0.72
-
-    // --- BỘ NHỚ LƯU TRỮ MANH MỐI "NHỎ GIỌT" (V4) ---
+    // Nhận dữ liệu từ ScreenGame truyền xuống
     property var revealedQ1: ({})
     property var revealedQ2: ({})
     property var revealedQ3: ({})
     property var revealedQ4: ({})
     property bool gameActive: false
 
-    property string oledMsg1: "Time is ticking..."
-    property string oledMsg2: ""
+    readonly property var rowBtn1Names: ["J","K","L","M","N"]
+    readonly property var rowBtn2Names: ["O","P","Q","R","S"]
+    readonly property var rowBtnY: [-7, 15, 36, 57, 79]
 
-    function evenOdd(i) {
-        let id = ["T","U","V","W","X","Y"][i]
-        return revealedQ1.hasOwnProperty(id) ? revealedQ1[id] : -1
-    }
+    function evenOdd(i) { let id = ["T","U","V","W","X","Y"][i]; return revealedQ1.hasOwnProperty(id) ? revealedQ1[id] : -1 }
+    function hCmpVal(i) { let pair = ["T-U", "U-V", "W-X", "X-Y"][i]; return revealedQ2.hasOwnProperty(pair) ? revealedQ2[pair] : 0 }
+    function vCmpVal(i) { let pair = ["T-W", "U-X", "V-Y"][i]; return revealedQ2.hasOwnProperty(pair) ? revealedQ2[pair] : 0 }
+    function colCount(i) { let id = ["A","B","C","D","E","F","G","H","I"][i]; return revealedQ3.hasOwnProperty(id) ? String(revealedQ3[id]) : "" }
+    function rowCount(i) { let id = ["J","K","L","M","N","O","P","Q","R","S"][i]; return revealedQ3.hasOwnProperty(id) ? String(revealedQ3[id]) : "" }
+    function getQ4Color(id) { if (!revealedQ4.hasOwnProperty(id)) return ""; return revealedQ4[id] === true ? "#10b981" : "#ef4444" }
 
-    function hCmpVal(i) {
-        let pair = ["T-U", "U-V", "W-X", "X-Y"][i]
-        return revealedQ2.hasOwnProperty(pair) ? revealedQ2[pair] : 0
-    }
+    // Các Component UI phụ trợ
+    component HArrowPairAuto: Item { width: 36; height: 96; property int cmpVal: 0; Column { anchors.centerIn: parent; spacing: 6; Rectangle { width: 20; height: 20; radius: 4; border.width: 1; visible: cmpVal === 1; color: "#b066ff"; border.color: "#9a4cee"; Text { anchors.centerIn: parent; text: ">"; color: "#fff"; font.pixelSize: 13; font.bold: true; font.family: "Courier New" } } Rectangle { width: 20; height: 20; radius: 4; border.width: 1; visible: cmpVal === -1; color: "#b066ff"; border.color: "#9a4cee"; Text { anchors.centerIn: parent; text: "<"; color: "#fff"; font.pixelSize: 13; font.bold: true; font.family: "Courier New" } } } }
+    component VArrowPairAuto: Item { width: 56; height: 36; property int cmpVal: 0; Row { anchors.centerIn: parent; spacing: 16; Rectangle { width: 20; height: 20; radius: 4; border.width: 1; visible: cmpVal === 1; rotation: 90; color: "#b066ff"; border.color: "#9a4cee"; Text { anchors.centerIn: parent; text: ">"; color: "#fff"; font.pixelSize: 13; font.bold: true; font.family: "Courier New" } } Rectangle { width: 20; height: 20; radius: 4; border.width: 1; visible: cmpVal === -1; rotation: 90; color: "#b066ff"; border.color: "#9a4cee"; Text { anchors.centerIn: parent; text: "<"; color: "#fff"; font.pixelSize: 13; font.bold: true; font.family: "Courier New" } } } }
+    component TopEODot: Rectangle { width: 24; height: 20; radius: 4; border.width: 1; property string dotType: "even"; color: "#b066ff"; border.color: "#9a4cee"; Text { anchors.centerIn: parent; text: dotType === "even" ? ".." : "."; color: "#fff"; font.pixelSize: 12; font.bold: true; font.letterSpacing: dotType === "even" ? 2 : 0 } }
+    component TopCounterBox: Rectangle { property string val: ""; width: 28; height: 22; border.color: "#777"; border.width: 1; radius: 2; color: val !== "" ? "#b066ff" : "#fff"; Text { anchors.centerIn: parent; text: val; font.pixelSize: 11; font.bold: true; color: parent.color === "#b066ff" ? "#fff" : "#333" } }
 
-    function vCmpVal(i) {
-        let pair = ["T-W", "U-X", "V-Y"][i]
-        return revealedQ2.hasOwnProperty(pair) ? revealedQ2[pair] : 0
-    }
+    // ==========================================
+    // KHU VỰC CHỨA BẢNG MẠCH - TỰ ĐỘNG AUTO-SCALE
+    // ==========================================
+    Item {
+        id: scaleContainer
+        width: 400  // Base Width lý tưởng
+        height: 520 // Base Height lý tưởng
+        anchors.centerIn: parent
 
-    function colCount(i) {
-        let id = ["A","B","C","D","E","F","G","H","I"][i]
-        return revealedQ3.hasOwnProperty(id) ? String(revealedQ3[id]) : ""
-    }
+        // Thuật toán: Lấy tỉ lệ nhỏ nhất giữa chiều rộng/cao cửa sổ so với kích thước gốc -> Đảm bảo luôn nằm gọn trong tab không bị méo.
+        scale: Math.min(root.width / width, root.height / height) * 0.95
+        transformOrigin: Item.Center
 
-    function rowCount(i) {
-        let id = ["J","K","L","M","N","O","P","Q","R","S"][i]
-        return revealedQ3.hasOwnProperty(id) ? String(revealedQ3[id]) : ""
-    }
 
-    function getQ4Color(id) {
-        if (!revealedQ4.hasOwnProperty(id)) return ""
-        return revealedQ4[id] === true ? "#10b981" : "#ef4444"
-    }
-
-    Connections {
-        target: gameBoard
-
-        function onGameWon() {
-            root.gameActive = false // Tắt trạng thái game
-        }
-
-        function onPuzzleGenerated() {
-            root.revealedQ1 = ({})
-            root.revealedQ2 = ({})
-            root.revealedQ3 = ({})
-            root.revealedQ4 = ({})
-            root.gameActive = true
-            root.oledMsg1 = "Time is ticking..."
-            root.oledMsg2 = ""
-        }
-
-        function onClueRevealed(clueType, targetId, value) {
-            if (clueType === "Q1_EODOT") {
-                let temp = root.revealedQ1
-                temp[targetId] = value
-                root.revealedQ1 = Object.assign({}, temp)
-            } else if (clueType === "Q2_ARROW") {
-                let temp = root.revealedQ2
-                temp[targetId] = value
-                root.revealedQ2 = Object.assign({}, temp)
-            } else if (clueType === "Q3_COUNTER") {
-                let temp = root.revealedQ3
-                temp[targetId] = value
-                root.revealedQ3 = Object.assign({}, temp)
-            } else if (clueType === "Q4_FULL") {
-                let temp = root.revealedQ4
-                temp[targetId] = value
-                root.revealedQ4 = Object.assign({}, temp)
-            }
-        }
-
-        function onOledUpdateRequested(line1, line2) {
-            if (line2 === "DEFAULT_LAYOUT" || line1.includes("[mm:ss]")) {
-                root.oledMsg1 = "Time is ticking..."
-                root.oledMsg2 = ""
-            } else {
-                root.oledMsg1 = line1
-                root.oledMsg2 = line2
-            }
-        }
-    }
-
-    // ── CÁC COMPONENT GIAO DIỆN PHỤ (CHỈ ĐỂ HIỂN THỊ KẾT QUẢ) ──
-    component HArrowPairAuto: Item {
-        width: 36
-        height: 96
-        property int cmpVal: 0
-
+        // 2. SA BÀN LED
         Column {
-            anchors.centerIn: parent
-            spacing: 6
+            id: boardCol
+            anchors.top: parent.top
+            anchors.topMargin: 15
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 0
 
-            Rectangle {
-                width: 20
-                height: 20
-                radius: 4
-                border.width: 1
-                visible: cmpVal === 1
-                color: "#b066ff"
-                border.color: "#9a4cee"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: ">"
-                    color: "#fff"
-                    font.pixelSize: 13
-                    font.bold: true
-                    font.family: "Courier New"
-                }
+            // HÀNG NÚT CỘT A-I
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter; spacing: 0
+                Item { width: 79; height: 24 }
+                Row { spacing: 2; Repeater { model: ["A","B","C"]; delegate: LogicButton { label: modelData; enabled: root.gameActive; opacity: root.gameActive ? 1.0 : 0.4; overrideColor: root.getQ4Color(modelData); onTapped: gameBoard.handleButtonPress("SW", modelData) } } }
+                Item { width: 28; height: 1 }
+                Row { spacing: 2; Repeater { model: ["D","E","F"]; delegate: LogicButton { label: modelData; enabled: root.gameActive; opacity: root.gameActive ? 1.0 : 0.4; overrideColor: root.getQ4Color(modelData); onTapped: gameBoard.handleButtonPress("SW", modelData) } } }
+                Item { width: 28; height: 1 }
+                Row { spacing: 2; Repeater { model: ["G","H","I"]; delegate: LogicButton { label: modelData; enabled: root.gameActive; opacity: root.gameActive ? 1.0 : 0.4; overrideColor: root.getQ4Color(modelData); onTapped: gameBoard.handleButtonPress("SW", modelData) } } }
             }
 
-            Rectangle {
-                width: 20
-                height: 20
-                radius: 4
-                border.width: 1
-                visible: cmpVal === -1
-                color: "#b066ff"
-                border.color: "#9a4cee"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "<"
-                    color: "#fff"
-                    font.pixelSize: 13
-                    font.bold: true
-                    font.family: "Courier New"
+            // HÀNG 1: T, U, V
+            Row {
+                spacing: 0; anchors.horizontalCenter: parent.horizontalCenter; topPadding: 8
+                Item {
+                    width: 62; height: 96
+                    Repeater { model: rowBtn1Names; delegate: Item { y: rowBtnY[index]; height: 24; width: 62; LogicButton { x: 0; y: 0; label: modelData; enabled: root.gameActive; opacity: root.gameActive ? 1.0 : 0.4; overrideColor: root.getQ4Color(modelData); onTapped: gameBoard.handleButtonPress("SW", modelData) } TopCounterBox { x: 28; y: 0; val: root.rowCount(index) } } }
                 }
-            }
-        }
-    }
-
-    component VArrowPairAuto: Item {
-        width: 56
-        height: 36
-        property int cmpVal: 0
-
-        Row {
-            anchors.centerIn: parent
-            spacing: 16
-
-            Rectangle {
-                width: 20
-                height: 20
-                radius: 4
-                border.width: 1
-                visible: cmpVal === 1
-                rotation: 90
-                color: "#b066ff"
-                border.color: "#9a4cee"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: ">"
-                    color: "#fff"
-                    font.pixelSize: 13
-                    font.bold: true
-                    font.family: "Courier New"
-                }
-            }
-
-            Rectangle {
-                width: 20
-                height: 20
-                radius: 4
-                border.width: 1
-                visible: cmpVal === -1
-                rotation: 90
-                color: "#b066ff"
-                border.color: "#9a4cee"
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "<"
-                    color: "#fff"
-                    font.pixelSize: 13
-                    font.bold: true
-                    font.family: "Courier New"
-                }
-            }
-        }
-    }
-
-    component TopEODot: Rectangle {
-        width: 24
-        height: 20
-        radius: 4
-        border.width: 1
-        property string dotType: "even"
-        color: "#b066ff"
-        border.color: "#9a4cee"
-
-        Text {
-            anchors.centerIn: parent
-            text: dotType === "even" ? ".." : "."
-            color: "#fff"
-            font.pixelSize: 12
-            font.bold: true
-            font.letterSpacing: dotType === "even" ? 2 : 0
-        }
-    }
-
-    component TopCounterBox: Rectangle {
-        property string val: ""
-        width: 28
-        height: 22
-        border.color: "#777"
-        border.width: 1
-        radius: 2
-        color: val !== "" ? "#b066ff" : "#fff"
-
-        Text {
-            anchors.centerIn: parent
-            text: val
-            font.pixelSize: 11
-            font.bold: true
-            color: parent.color === "#b066ff" ? "#fff" : "#333"
-        }
-    }
-
-    // ── NÚT TẠO ĐỀ BÀI ──
-    Rectangle {
-        id: genBtn
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: 250
-        height: 40
-        color: "#b066ff"
-        radius: 6
-        z: 10
-        visible: !root.gameActive
-
-        Text {
-            anchors.centerIn: parent
-            text: "START YOUR CHALLENGE"
-            color: "white"
-            font.bold: true
-            font.pixelSize: 14
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            onClicked: gameBoard.generateRandomPuzzle()
-        }
-    }
-
-    // ── BẢNG ĐIỀU KHIỂN PHẦN MỀM (OLED ẢO, TIMER, POINTS, Q1-Q4) ──
-    Rectangle {
-        id: controlPanel
-        anchors.top: genBtn.bottom
-        anchors.topMargin: 10
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: parent.width - 20
-        height: 65
-        color: "#2d2d2d"
-        radius: 6
-        visible: root.gameActive
-
-        Text {
-            anchors.left: parent.left
-            anchors.leftMargin: 15
-            anchors.verticalCenter: parent.verticalCenter
-            color: "#10b981"
-            font.pixelSize: 14
-            font.bold: true
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-            text: {
-                let m = Math.floor(gameBoard.playTimeSeconds / 60)
-                let s = gameBoard.playTimeSeconds % 60
-                return "TIME: " + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s + "\nPTS : " + gameBoard.points
-            }
-        }
-
-        Text {
-            anchors.centerIn: parent
-            color: "#ffb700"
-            font.pixelSize: 14
-            font.bold: true
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-            horizontalAlignment: Text.AlignHCenter
-            text: root.oledMsg1 + (root.oledMsg2 !== "" ? "\n" + root.oledMsg2 : "")
-        }
-
-        Row {
-            anchors.right: parent.right
-            anchors.rightMargin: 15
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            Repeater {
-                model: ["Q1", "Q2", "Q3", "Q4"]
-                delegate: Rectangle {
-                    width: 36
-                    height: 32
-                    color: "#b066ff"
-                    radius: 4
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData
-                        color: "white"
-                        font.bold: true
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: gameBoard.handleButtonPress("SW", "BTN_" + modelData)
-                    }
-                }
-            }
-        }
-    }
-
-    // ── GIAO DIỆN BẢNG MẠCH SA BÀN ──
-    Flickable {
-        anchors.top: controlPanel.visible ? controlPanel.bottom : genBtn.bottom
-        anchors.topMargin: 10
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        clip: true
-        flickableDirection: Flickable.VerticalFlick
-        contentWidth: width
-        contentHeight: (boardCol.implicitHeight + 20) * boardScale
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-
-        Item {
-            width: parent.width
-            height: parent.contentHeight
-
-            Column {
-                id: boardCol
-                scale: boardScale
-                transformOrigin: Item.Top
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: 10
-                spacing: 0
-
-                // ── HÀNG NÚT CỘT A-I ──
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 0
-
-                    Item {
-                        width: 79
-                        height: 24
-                    }
-
-                    Row {
-                        spacing: 2
-                        Repeater {
-                            model: ["A","B","C"]
-                            delegate: LogicButton {
-                                label: modelData
-                                enabled: root.gameActive
-                                opacity: root.gameActive ? 1.0 : 0.4
-                                overrideColor: root.getQ4Color(modelData)
-                                onTapped: gameBoard.handleButtonPress("SW", modelData)
-                            }
-                        }
-                    }
-
-                    Item {
-                        width: 28
-                        height: 1
-                    }
-
-                    Row {
-                        spacing: 2
-                        Repeater {
-                            model: ["D","E","F"]
-                            delegate: LogicButton {
-                                label: modelData
-                                enabled: root.gameActive
-                                opacity: root.gameActive ? 1.0 : 0.4
-                                overrideColor: root.getQ4Color(modelData)
-                                onTapped: gameBoard.handleButtonPress("SW", modelData)
-                            }
-                        }
-                    }
-
-                    Item {
-                        width: 28
-                        height: 1
-                    }
-
-                    Row {
-                        spacing: 2
-                        Repeater {
-                            model: ["G","H","I"]
-                            delegate: LogicButton {
-                                label: modelData
-                                enabled: root.gameActive
-                                opacity: root.gameActive ? 1.0 : 0.4
-                                overrideColor: root.getQ4Color(modelData)
-                                onTapped: gameBoard.handleButtonPress("SW", modelData)
-                            }
-                        }
-                    }
-                }
-
-                // ── HÀNG 1: T, U, V ──
+                Item { width: 18; height: 1 }
                 Row {
                     spacing: 0
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    topPadding: 8
-
-                    Item {
-                        width: 62
-                        height: 96
-
-                        Repeater {
-                            model: rowBtn1Names
-                            delegate: Item {
-                                y: rowBtnY[index]
-                                height: 24
-                                width: 62
-
-                                LogicButton {
-                                    x: 0
-                                    y: 0
-                                    label: modelData
-                                    enabled: root.gameActive
-                                    opacity: root.gameActive ? 1.0 : 0.4
-                                    overrideColor: root.getQ4Color(modelData)
-                                    onTapped: gameBoard.handleButtonPress("SW", modelData)
-                                }
-
-                                TopCounterBox {
-                                    x: 28
-                                    y: 0
-                                    val: root.rowCount(index)
-                                }
-                            }
-                        }
-                    }
-
-                    Item {
-                        width: 18
-                        height: 1
-                    }
-
-                    Row {
-                        spacing: 0
-                        Repeater {
-                            model: 3
-                            delegate: Row {
-                                required property int index
-                                spacing: 0
-
-                                Item {
-                                    width: 56
-                                    height: 96
-
-                                    Rectangle {
-                                        x: -22
-                                        y: -2
-                                        width: 18
-                                        height: 18
-                                        color: "#888"
-                                        radius: 2
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: ["T","U","V"][index]
-                                            color: "white"
-                                            font.pixelSize: 11
-                                            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            enabled: root.gameActive
-                                            onClicked: gameBoard.handleButtonPress("SW", ["T","U","V"][index])
-                                        }
-                                    }
-
-                                    LedDisplay {
-                                        anchors.fill: parent
-                                        interactive: root.gameActive
-                                        ledIndex: index
-                                    }
-
-                                    TopEODot {
-                                        x: (56 - width) / 2
-                                        y: 26 - height / 2
-                                        dotType: "even"
-                                        visible: root.evenOdd(index) === 0
-                                    }
-
-                                    TopEODot {
-                                        x: (56 - width) / 2
-                                        y: 69 - height / 2
-                                        dotType: "odd"
-                                        visible: root.evenOdd(index) === 1
-                                    }
-                                }
-
-                                HArrowPairAuto {
-                                    visible: index < 2
-                                    width: visible ? 36 : 0
-                                    cmpVal: index < 2 ? root.hCmpVal(index) : 0
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ── Mũi tên DỌC ──
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 0
-                    topPadding: 8
-                    bottomPadding: 8
-
-                    Item {
-                        width: 78
-                        height: 36
-                    }
-
                     Repeater {
                         model: 3
                         delegate: Row {
-                            spacing: 0
-
-                            VArrowPairAuto {
-                                cmpVal: root.vCmpVal(index)
-                            }
-
+                            required property int index; spacing: 0
                             Item {
-                                visible: index < 2
-                                width: visible ? 36 : 0
-                                height: 1
+                                width: 56; height: 96
+                                Rectangle { x: -22; y: -2; width: 18; height: 18; color: "#888"; radius: 2; Text { anchors.centerIn: parent; text: ["T","U","V"][index]; color: "white"; font.pixelSize: 11; font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New" } MouseArea { anchors.fill: parent; enabled: root.gameActive; onClicked: gameBoard.handleButtonPress("SW", ["T","U","V"][index]) } }
+                                LedDisplay { anchors.fill: parent; interactive: root.gameActive; ledIndex: index }
+                                TopEODot { x: (56 - width) / 2; y: 26 - height / 2; dotType: "even"; visible: root.evenOdd(index) === 0 }
+                                TopEODot { x: (56 - width) / 2; y: 69 - height / 2; dotType: "odd"; visible: root.evenOdd(index) === 1 }
                             }
+                            HArrowPairAuto { visible: index < 2; width: visible ? 36 : 0; cmpVal: index < 2 ? root.hCmpVal(index) : 0 }
                         }
                     }
                 }
+            }
 
-                // ── HÀNG 2: W, X, Y ──
+            // MŨI TÊN DỌC
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter; spacing: 0; topPadding: 8; bottomPadding: 8
+                Item { width: 78; height: 36 }
+                Repeater { model: 3; delegate: Row { spacing: 0; VArrowPairAuto { cmpVal: root.vCmpVal(index) } Item { visible: index < 2; width: visible ? 36 : 0; height: 1 } } }
+            }
+
+            // HÀNG 2: W, X, Y
+            Row {
+                spacing: 0; anchors.horizontalCenter: parent.horizontalCenter
+                Item {
+                    width: 62; height: 96
+                    Repeater { model: rowBtn2Names; delegate: Item { y: rowBtnY[index]; height: 24; width: 62; LogicButton { x: 0; y: 0; label: modelData; enabled: root.gameActive; opacity: root.gameActive ? 1.0 : 0.4; overrideColor: root.getQ4Color(modelData); onTapped: gameBoard.handleButtonPress("SW", modelData) } TopCounterBox { x: 28; y: 0; val: root.rowCount(index + 5) } } }
+                }
+                Item { width: 18; height: 1 }
                 Row {
                     spacing: 0
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    Item {
-                        width: 62
-                        height: 96
-
-                        Repeater {
-                            model: rowBtn2Names
-                            delegate: Item {
-                                y: rowBtnY[index]
-                                height: 24
-                                width: 62
-
-                                LogicButton {
-                                    x: 0
-                                    y: 0
-                                    label: modelData
-                                    enabled: root.gameActive
-                                    opacity: root.gameActive ? 1.0 : 0.4
-                                    overrideColor: root.getQ4Color(modelData)
-                                    onTapped: gameBoard.handleButtonPress("SW", modelData)
-                                }
-
-                                TopCounterBox {
-                                    x: 28
-                                    y: 0
-                                    val: root.rowCount(index + 5)
-                                }
+                    Repeater {
+                        model: 3
+                        delegate: Row {
+                            required property int index; spacing: 0
+                            Item {
+                                width: 56; height: 130
+                                Rectangle { x: -22; y: -2; width: 18; height: 18; color: "#888"; radius: 2; Text { anchors.centerIn: parent; text: ["W","X","Y"][index]; color: "white"; font.pixelSize: 11; font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New" } MouseArea { anchors.fill: parent; enabled: root.gameActive; onClicked: gameBoard.handleButtonPress("SW", ["W","X","Y"][index]) } }
+                                LedDisplay { x: 0; y: 0; width: 56; height: 96; interactive: root.gameActive; ledIndex: index + 3 }
+                                TopEODot { x: (56 - width) / 2; y: 26 - height / 2; dotType: "even"; visible: root.evenOdd(index + 3) === 0 }
+                                TopEODot { x: (56 - width) / 2; y: 69 - height / 2; dotType: "odd"; visible: root.evenOdd(index + 3) === 1 }
+                                Row { y: 102; anchors.horizontalCenter: parent.horizontalCenter; spacing: 0; TopCounterBox { val: root.colCount(index * 3) } TopCounterBox { val: root.colCount(index * 3 + 1) } TopCounterBox { val: root.colCount(index * 3 + 2) } }
                             }
-                        }
-                    }
-
-                    Item {
-                        width: 18
-                        height: 1
-                    }
-
-                    Row {
-                        spacing: 0
-                        Repeater {
-                            model: 3
-                            delegate: Row {
-                                required property int index
-                                spacing: 0
-
-                                Item {
-                                    width: 56
-                                    height: 130
-
-                                    Rectangle {
-                                        x: -22
-                                        y: -2
-                                        width: 18
-                                        height: 18
-                                        color: "#888"
-                                        radius: 2
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: ["W","X","Y"][index]
-                                            color: "white"
-                                            font.pixelSize: 11
-                                            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            enabled: root.gameActive
-                                            onClicked: gameBoard.handleButtonPress("SW", ["W","X","Y"][index])
-                                        }
-                                    }
-
-                                    LedDisplay {
-                                        x: 0
-                                        y: 0
-                                        width: 56
-                                        height: 96
-                                        interactive: root.gameActive
-                                        ledIndex: index + 3
-                                    }
-
-                                    TopEODot {
-                                        x: (56 - width) / 2
-                                        y: 26 - height / 2
-                                        dotType: "even"
-                                        visible: root.evenOdd(index + 3) === 0
-                                    }
-
-                                    TopEODot {
-                                        x: (56 - width) / 2
-                                        y: 69 - height / 2
-                                        dotType: "odd"
-                                        visible: root.evenOdd(index + 3) === 1
-                                    }
-
-                                    Row {
-                                        y: 102
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        spacing: 0
-
-                                        TopCounterBox {
-                                            val: root.colCount(index * 3)
-                                        }
-
-                                        TopCounterBox {
-                                            val: root.colCount(index * 3 + 1)
-                                        }
-
-                                        TopCounterBox {
-                                            val: root.colCount(index * 3 + 2)
-                                        }
-                                    }
-                                }
-
-                                HArrowPairAuto {
-                                    visible: index < 2
-                                    width: visible ? 36 : 0
-                                    cmpVal: index < 2 ? root.hCmpVal(index + 2) : 0
-                                }
-                            }
+                            HArrowPairAuto { visible: index < 2; width: visible ? 36 : 0; cmpVal: index < 2 ? root.hCmpVal(index + 2) : 0 }
                         }
                     }
                 }
@@ -1860,35 +1353,24 @@ Rectangle {
     width: 24; height: 20
     radius: 4
     border.width: 1
+
+    // Thêm property để nhận giá trị từ hệ thống (truyền từ LedDisplay)
+    property int systemValue: -1
     property string dotType: "even"
-    property bool selected: false
-    property int autoVal: -1
-    property bool clickable: true
 
-    visible: autoVal === -1
-             || (autoVal === 0 && dotType === "even")
-             || (autoVal === 1 && dotType === "odd")
+    // CHỈ HIỆN KHI systemValue khác -1 (tức là đã được hệ thống trả về)
+    visible: systemValue !== -1
 
-    color: selected ? "#b066ff" : "#e0e0e0"
-    border.color: selected ? "#9a4cee" : "#cccccc"
-
-    signal tapped()
+    color: "#b066ff"
+    border.color: "#9a4cee"
 
     Text {
         anchors.centerIn: parent
         text: root.dotType === "even" ? ".." : "."
-        color: root.selected ? "#ffffff" : "#777777"
+        color: "#fff"
         font.pixelSize: 12
         font.bold: true
         font.letterSpacing: root.dotType === "even" ? 2 : 0
-    }
-    MouseArea {
-        anchors.fill: parent
-        enabled: root.clickable  // ← dùng clickable thay vì check autoVal
-        onClicked: {
-            root.selected = !root.selected
-            root.tapped()
-        }
     }
 }import QtQuick
 import QtQuick.Shapes
@@ -2017,8 +1499,7 @@ Item {
         x: (root.width - width) / 2
         y: 26 - height / 2
         dotType: "even"
-        visible: interactive
-        onTapped: { if (dotEven.selected) dotOdd.selected = false }
+        systemValue: parent.parent.parent.parent.parent.evenOdd(root.ledIndex) === 0 ? 0 : -1
     }
 
     EODot {
@@ -2026,8 +1507,7 @@ Item {
         x: (root.width - width) / 2
         y: 69 - height / 2
         dotType: "odd"
-        visible: interactive
-        onTapped: { if (dotOdd.selected) dotEven.selected = false }
+        systemValue: parent.parent.parent.parent.parent.evenOdd(root.ledIndex) === 1 ? 1 : -1
     }
 }import QtQuick
 
@@ -2060,481 +1540,290 @@ Rectangle {
 }import QtQuick
 import QtQuick.Controls
 
-Window {
-    id: root
+ApplicationWindow {
+    id: mainWindow
     width: 580
     height: 650
     visible: true
-    title: "Digit Code SINGLE"
+    title: "Digit Code SINGLE v5"
     color: "#ffffff"
 
-    BottomBoard {
-            anchors.fill: parent
-            anchors.margins: 10
-        }
+    StackView {
+        id: stackView
+        anchors.fill: parent
+        initialItem: "ScreenMenu.qml" // Khởi động lên là vào Menu đầu tiên
+    }
 }import QtQuick
 import QtQuick.Controls
 
 Item {
     id: root
 
-    readonly property var rowBtn1Names: ["J","K","L","M","N"]
-    readonly property var rowBtn2Names: ["O","P","Q","R","S"]
-    readonly property var rowBtnY: [-7, 15, 36, 57, 79]
-    readonly property var rowCounterMax: [3, 6, 3, 6, 3]
-    readonly property real boardScale: 0.72
+    // --- BIẾN LƯU TRỮ MANH MỐI TỪ C++ ---
+    property var revealedQ1: ({})
+    property var revealedQ2: ({})
+    property var revealedQ3: ({})
+    property var revealedQ4: ({})
+    property bool gameActive: false
+    property string oledMsg1: "Time is ticking..."
+    property string oledMsg2: ""
 
-    property var topStats: ({})
-    property bool hasStats: Object.keys(topStats).length > 0
-
-    function evenOdd(i)  { return hasStats ? topStats.evenOdd[i]   : -1 }
-    function hCmpVal(i)  { return hasStats ? topStats.hCmp[i]      :  0 }
-    function vCmpVal(i)  { return hasStats ? topStats.vCmp[i]      :  0 }
-    function colCount(i) { return hasStats ? topStats.colCounts[i] : "" }
-    function rowCount(i) { return hasStats ? topStats.rowCounts[i] : "" }
-
+    // --- KẾT NỐI VỚI BACKEND ---
     Connections {
         target: gameBoard
-        function onTopStatsChanged(stats) { root.topStats = stats }
-    }
 
-    function validateDigits(raw) {
-        let valid = ""
-        for (let i = 0; i < raw.length; i++) {
-            let ch = raw[i]
-            if (valid.length >= 6) break
-            let count = valid.split("").filter(c => c === ch).length
-            if (count >= 2) continue
-            let idx = valid.length
-            if (idx % 3 !== 0 && valid[idx - 1] === ch) continue
-            if (idx >= 3 && valid[idx - 3] === ch) continue
-            valid += ch
+        function onGameWon() { root.gameActive = false; stackView.replace("ScreenResult.qml", { "isWin": true }) }
+        function onGameLost() { root.gameActive = false; stackView.replace("ScreenResult.qml", { "isWin": false }) }
+
+        function onPuzzleGenerated() {
+            root.revealedQ1 = ({}); root.revealedQ2 = ({}); root.revealedQ3 = ({}); root.revealedQ4 = ({})
+            root.gameActive = true
+            root.oledMsg1 = "Time is ticking..."; root.oledMsg2 = ""
         }
-        return valid
-    }
 
-    // ── HArrowPairAuto ──
-    component HArrowPairAuto: Item {
-        width: 36; height: 96
-        property int cmpVal: 0
+        function onClueRevealed(clueType, targetId, value) {
+            if (clueType === "Q1_EODOT") { let temp = root.revealedQ1; temp[targetId] = value; root.revealedQ1 = Object.assign({}, temp) }
+            else if (clueType === "Q2_ARROW") { let temp = root.revealedQ2; temp[targetId] = value; root.revealedQ2 = Object.assign({}, temp) }
+            else if (clueType === "Q3_COUNTER") { let temp = root.revealedQ3; temp[targetId] = value; root.revealedQ3 = Object.assign({}, temp) }
+            else if (clueType === "Q4_FULL") { let temp = root.revealedQ4; temp[targetId] = value; root.revealedQ4 = Object.assign({}, temp) }
+        }
 
-        Column {
-            anchors.centerIn: parent; spacing: 6
-
-            Rectangle {
-                width: 20; height: 20; radius: 4; border.width: 1
-                visible: cmpVal === 1
-                property bool selected: false
-                color: selected ? "#b066ff" : "#e0e0e0"
-                border.color: selected ? "#9a4cee" : "#cccccc"
-                Text {
-                    anchors.centerIn: parent; text: ">"
-                    color: parent.selected ? "#fff" : "#777"
-                    font.pixelSize: 13; font.bold: true; font.family: "Courier New"
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: parent.selected = !parent.selected
-                }
-            }
-
-            Rectangle {
-                width: 20; height: 20; radius: 4; border.width: 1
-                visible: cmpVal === -1
-                property bool selected: false
-                color: selected ? "#b066ff" : "#e0e0e0"
-                border.color: selected ? "#9a4cee" : "#cccccc"
-                Text {
-                    anchors.centerIn: parent; text: "<"
-                    color: parent.selected ? "#fff" : "#777"
-                    font.pixelSize: 13; font.bold: true; font.family: "Courier New"
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: parent.selected = !parent.selected
-                }
-            }
+        function onOledUpdateRequested(line1, line2) {
+            if (line2 === "DEFAULT_LAYOUT" || line1.includes("[mm:ss]")) {
+                root.oledMsg1 = "Time is ticking..."; root.oledMsg2 = ""
+            } else { root.oledMsg1 = line1; root.oledMsg2 = line2 }
         }
     }
 
-    // ── VArrowPairAuto ──
-    component VArrowPairAuto: Item {
-        width: 56; height: 36
-        property int cmpVal: 0
-
-        Row {
-            anchors.centerIn: parent; spacing: 16
-
-            Rectangle {
-                width: 20; height: 20; radius: 4; border.width: 1
-                visible: cmpVal === 1
-                property bool selected: false
-                color: selected ? "#b066ff" : "#e0e0e0"
-                border.color: selected ? "#9a4cee" : "#cccccc"
-                rotation: 90
-                Text {
-                    anchors.centerIn: parent; text: ">"
-                    color: parent.selected ? "#fff" : "#777"
-                    font.pixelSize: 13; font.bold: true; font.family: "Courier New"
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: parent.selected = !parent.selected
-                }
-            }
-
-            Rectangle {
-                width: 20; height: 20; radius: 4; border.width: 1
-                visible: cmpVal === -1
-                property bool selected: false
-                color: selected ? "#b066ff" : "#e0e0e0"
-                border.color: selected ? "#9a4cee" : "#cccccc"
-                rotation: 90
-                Text {
-                    anchors.centerIn: parent; text: "<"
-                    color: parent.selected ? "#fff" : "#777"
-                    font.pixelSize: 13; font.bold: true; font.family: "Courier New"
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: parent.selected = !parent.selected
-                }
-            }
-        }
-    }
-
-    // ── EODot có thể click ──
-    component TopEODot: Rectangle {
-        width: 24; height: 20; radius: 4; border.width: 1
-        property string dotType: "even"
-        property bool selected: false
-        color: selected ? "#b066ff" : "#e0e0e0"
-        border.color: selected ? "#9a4cee" : "#cccccc"
-        Text {
-            anchors.centerIn: parent
-            text: dotType === "even" ? ".." : "."
-            color: parent.selected ? "#fff" : "#777"
-            font.pixelSize: 12; font.bold: true
-            font.letterSpacing: dotType === "even" ? 2 : 0
-        }
-        MouseArea {
-            anchors.fill: parent
-            onClicked: parent.selected = !parent.selected
-        }
-    }
-
-    // ── Counter box có thể click ──
-    component TopCounterBox: Rectangle {
-        property string val: ""
-        width: 28; height: 22
-        border.color: "#777"; border.width: 1; radius: 2
-        property bool selected: false
-        color: selected ? "#b066ff" : "#fff"
-        Text {
-            anchors.centerIn: parent
-            text: val
-            font.pixelSize: 11; font.bold: true
-            color: parent.selected ? "#fff" : "#333"
-        }
-        MouseArea {
-            anchors.fill: parent
-            enabled: val !== ""
-            onClicked: parent.selected = !parent.selected
-        }
-    }
-
-    // ── Input cố định ──
-    Rectangle {
-        id: inputBox
+    // --- 1. NÚT BACK ---
+    Button {
+        id: btnBack // Đặt ID để làm mốc neo cho OLED
+        text: "❮ Back to Menu"
         anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: Math.min(parent.width - 20, 400)
-        height: 50
-        color: "#e9e9e9"; border.color: "#999"; border.width: 2; radius: 5
-        z: 10
+        anchors.left: parent.left
+        anchors.margins: 15
+        width: 140; height: 35; z: 100
+        background: Rectangle { color: "#6b7280"; radius: 5 }
+        contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
 
-        TextInput {
-            id: codeInput
-            anchors.centerIn: parent
-            width: parent.width - 20
-            font.pixelSize: 24; font.bold: true
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-            horizontalAlignment: Text.AlignHCenter
-            inputMethodHints: Qt.ImhDigitsOnly
-            color: "#333"; maximumLength: 12
-
-            Text {
-                anchors.centerIn: parent
-                text: "ENTER 6 DIGITS..."
-                font: parent.font; color: "#aaa"
-                visible: parent.text.length === 0
-            }
-
-            property bool isUpdating: false
-            onTextChanged: {
-                if (isUpdating) return
-                isUpdating = true
-                let raw = text.replace(/[^0-9]/g, "")
-                let valid = root.validateDigits(raw)
-                if (text !== valid) {
-                    let pos = cursorPosition
-                    text = valid
-                    cursorPosition = Math.min(pos, valid.length)
-                }
-                gameBoard.setTopDigits(valid)
-                isUpdating = false
-            }
+        onClicked: {
+            gameBoard.pauseGame();
+            stackView.push("ScreenMenu.qml", { "hasSavedGame": true });
         }
     }
 
-    // ── Board scroll ──
-    Flickable {
-        anchors.top: inputBox.bottom
-        anchors.topMargin: 8
+    // --- 2. BẢNG OLED ĐIỀU KHIỂN ---
+    Rectangle {
+        id: controlPanel
+        // Kéo mảng OLED xuống dưới nút Back
+        anchors.top: btnBack.bottom
+        anchors.topMargin: 20
+        // Kéo giãn full ngang màn hình (chừa lề 15px cho đẹp)
         anchors.left: parent.left
         anchors.right: parent.right
+        anchors.leftMargin: 15
+        anchors.rightMargin: 15
+        height: 70
+        color: "#2d2d2d"; radius: 8
+        visible: root.gameActive
+
+        Text {
+            anchors.left: parent.left; anchors.leftMargin: 20; anchors.verticalCenter: parent.verticalCenter
+            color: "#10b981"; font.pixelSize: 14; font.bold: true; font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            text: {
+                let m = Math.floor(gameBoard.playTimeSeconds / 60)
+                let s = gameBoard.playTimeSeconds % 60
+                return "TIME: " + (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s + "\nPTS : " + gameBoard.points
+            }
+        }
+
+        Text {
+            anchors.centerIn: parent; color: "#ffb700"; font.pixelSize: 15; font.bold: true
+            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"; horizontalAlignment: Text.AlignHCenter
+            text: root.oledMsg1 + (root.oledMsg2 !== "" ? "\n" + root.oledMsg2 : "")
+        }
+
+        Row {
+            anchors.right: parent.right; anchors.rightMargin: 20; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+            Repeater {
+                model: ["Q1", "Q2", "Q3", "Q4"]
+                delegate: Rectangle {
+                    width: 38; height: 32; color: "#b066ff"; radius: 6
+                    Text { anchors.centerIn: parent; text: modelData; color: "white"; font.bold: true; font.pixelSize: 13 }
+                    MouseArea { anchors.fill: parent; onClicked: gameBoard.handleButtonPress("SW", "BTN_" + modelData) }
+                }
+            }
+        }
+    }
+
+    // --- 3. GỌI SA BÀN VÀ TRUYỀN DỮ LIỆU XUỐNG ---
+    BottomBoard {
+        anchors.top: controlPanel.bottom
+        anchors.topMargin: 15
         anchors.bottom: parent.bottom
-        clip: true
-        flickableDirection: Flickable.VerticalFlick
-        contentWidth: width
-        contentHeight: (boardCol.implicitHeight + 20) * boardScale
-        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        anchors.left: parent.left
+        anchors.right: parent.right
 
-        Item {
-            width: parent.width
-            height: parent.contentHeight
+        revealedQ1: root.revealedQ1
+        revealedQ2: root.revealedQ2
+        revealedQ3: root.revealedQ3
+        revealedQ4: root.revealedQ4
+        gameActive: root.gameActive
+    }
+}import QtQuick
+import QtQuick.Controls
 
-            Column {
-                id: boardCol
-                scale: boardScale
-                transformOrigin: Item.Top
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: 10; spacing: 0
+Item {
+    id: root
 
-                // ── HÀNG NÚT CỘT A-I ──
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 0
-                    Item { width: 79; height: 24 }
-                    Row {
-                        spacing: 2
-                        Repeater {
-                            model: ["A","B","C"]
-                            delegate: LogicButton {
-                                label: modelData
-                                isPurpleToggle: true
-                                enabled: root.hasStats
-                                opacity: root.hasStats ? 1.0 : 0.4
-                            }
-                        }
-                    }
-                    Item { width: 28; height: 1 }
-                    Row {
-                        spacing: 2
-                        Repeater {
-                            model: ["D","E","F"]
-                            delegate: LogicButton {
-                                label: modelData
-                                isPurpleToggle: true
-                                enabled: root.hasStats
-                                opacity: root.hasStats ? 1.0 : 0.4
-                            }
-                        }
-                    }
-                    Item { width: 28; height: 1 }
-                    Row {
-                        spacing: 2
-                        Repeater {
-                            model: ["G","H","I"]
-                            delegate: LogicButton {
-                                label: modelData
-                                isPurpleToggle: true
-                                enabled: root.hasStats
-                                opacity: root.hasStats ? 1.0 : 0.4
-                            }
-                        }
-                    }
+    // Biến cờ hiệu: true nếu màn hình này được bật lên từ nút "Back to Menu"
+    property bool hasSavedGame: false
+
+    Rectangle {
+        anchors.fill: parent
+        color: "#f3f4f6"
+    }
+
+    Text {
+        anchors.top: parent.top
+        anchors.topMargin: 80
+        anchors.horizontalCenter: parent.horizontalCenter
+        text: "DIGIT CODE"
+        font.pixelSize: 45
+        font.bold: true
+        font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+    }
+
+    Column {
+        anchors.centerIn: parent
+        spacing: 20
+
+        // 1. NÚT CONTINUE (Chỉ hiện khi có game đang tạm dừng)
+        Button {
+            text: "Continue"
+            width: 220; height: 55
+            font.pixelSize: 18
+            visible: root.hasSavedGame // Ẩn/hiện dựa vào cờ hiệu
+
+            background: Rectangle { color: "#10b981"; radius: 5 } // Màu xanh lá nổi bật
+            contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+
+            onClicked: {
+                gameBoard.resumeGame(); // Đánh thức Timer chạy lại
+                stackView.pop(); // Rút Menu này ra khỏi ngăn xếp -> Lộ ra ScreenGame nguyên vẹn ở bên dưới!
+            }
+        }
+
+        // 2. NÚT CHƠI MỚI
+        Button {
+            text: root.hasSavedGame ? "New Single Challenge" : "Single Challenge"
+            width: 220; height: 55
+            font.pixelSize: 18
+
+            background: Rectangle { color: root.hasSavedGame ? "#ef4444" : "#ffffff"; border.color: "#ccc"; radius: 5 }
+            contentItem: Text { text: parent.text; color: root.hasSavedGame ? "white" : "black"; font.bold: !root.hasSavedGame; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+
+            onClicked: {
+                if (root.hasSavedGame) {
+                    // Nếu đang có game cũ mà vẫn bấm chơi mới -> Phá hủy toàn bộ ngăn xếp về tận gốc
+                    stackView.pop(null);
+                    stackView.push("ScreenReady.qml"); // Sau đó mở màn hình Ready
+                } else {
+                    stackView.push("ScreenReady.qml");
                 }
+            }
+        }
 
-                // ── HÀNG 1: T, U, V ──
-                Row {
-                    spacing: 0
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    topPadding: 8
+        Button {
+            text: "1v1 Challenge"
+            width: 220; height: 55
+            font.pixelSize: 18
+            enabled: false
+        }
 
-                    Item {
-                        width: 62; height: 96
-                        Repeater {
-                            model: rowBtn1Names
-                            delegate: Item {
-                                y: rowBtnY[index]; height: 24; width: 62
-                                LogicButton {
-                                    x: 0; y: 0; label: modelData
-                                    isPurpleToggle: true
-                                    enabled: root.hasStats
-                                    opacity: root.hasStats ? 1.0 : 0.4
-                                }
-                                TopCounterBox {
-                                    x: 28; y: 0
-                                    val: root.hasStats ? String(root.rowCount(index)) : ""
-                                }
-                            }
-                        }
-                    }
+        Button {
+            text: "Rules"
+            width: 220; height: 55
+            font.pixelSize: 18
+        }
+    }
+}import QtQuick
+import QtQuick.Controls
 
-                    Item { width: 18; height: 1 }
+Item {
+    id: root
 
-                    Row {
-                        spacing: 0
-                        Repeater {
-                            model: 3
-                            delegate: Row {
-                                required property int index
-                                spacing: 0
+    Rectangle {
+        anchors.fill: parent
+        color: "#e5e7eb"
+    }
 
-                                Item {
-                                    width: 56; height: 96
+    Button {
+        text: "< Back"
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.margins: 20
+        onClicked: stackView.pop() // Quay về màn trước đó
+    }
 
-                                    Rectangle {
-                                        x: -22; y: -2; width: 18; height: 18
-                                        color: "#888"; radius: 2
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: ["T","U","V"][index]
-                                            color: "white"; font.pixelSize: 11
-                                            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-                                        }
-                                    }
+    Button {
+        text: "READY"
+        anchors.centerIn: parent
+        width: 180; height: 70
+        font.pixelSize: 24
+        font.bold: true
+        onClicked: {
+            stackView.replace("ScreenGame.qml") // Dùng replace để vứt màn Ready đi, không cho quay lại
 
-                                    LedDisplay {
-                                        anchors.fill: parent
-                                        interactive: false
-                                        ledIndex: index
-                                    }
+            gameBoard.generateRandomPuzzle()
+        }
+    }
+}import QtQuick
+import QtQuick.Controls
 
-                                    TopEODot {
-                                        x: (56 - width) / 2; y: 26 - height / 2
-                                        dotType: "even"
-                                        visible: root.hasStats && root.evenOdd(index) === 0
-                                    }
-                                    TopEODot {
-                                        x: (56 - width) / 2; y: 69 - height / 2
-                                        dotType: "odd"
-                                        visible: root.hasStats && root.evenOdd(index) === 1
-                                    }
-                                }
+Item {
+    id: root
 
-                                HArrowPairAuto {
-                                    visible: index < 2
-                                    width: visible ? 36 : 0
-                                    cmpVal: index < 2 ? root.hCmpVal(index) : 0
-                                }
-                            }
-                        }
-                    }
-                }
+    // Biến này sẽ nhận giá trị true/false từ ScreenGame truyền sang
+    property bool isWin: false
 
-                // ── Mũi tên DỌC T-W, U-X, V-Y ──
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 0; topPadding: 8; bottomPadding: 8
-                    Item { width: 78; height: 36 }
-                    Repeater {
-                        model: 3
-                        delegate: Row {
-                            spacing: 0
-                            VArrowPairAuto { cmpVal: root.vCmpVal(index) }
-                            Item { visible: index < 2; width: visible ? 36 : 0; height: 1 }
-                        }
-                    }
-                }
+    Rectangle {
+        anchors.fill: parent
+        color: isWin ? "#ecfdf5" : "#fef2f2" // Nền xanh nếu thắng, nền đỏ nếu thua
+    }
 
-                // ── HÀNG 2: W, X, Y ──
-                Row {
-                    spacing: 0
-                    anchors.horizontalCenter: parent.horizontalCenter
+    Text {
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: -80
+        text: isWin ? "CONGRATULATIONS!" : "BETTER LUCK NEXT LIFE..."
+        font.pixelSize: 32
+        font.bold: true
+        color: isWin ? "#10b981" : "#ef4444"
+        font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+    }
 
-                    Item {
-                        width: 62; height: 96
-                        Repeater {
-                            model: rowBtn2Names
-                            delegate: Item {
-                                y: rowBtnY[index]; height: 24; width: 62
-                                LogicButton {
-                                    x: 0; y: 0; label: modelData
-                                    isPurpleToggle: true
-                                    enabled: root.hasStats
-                                    opacity: root.hasStats ? 1.0 : 0.4
-                                }
-                                TopCounterBox {
-                                    x: 28; y: 0
-                                    val: root.hasStats ? String(root.rowCount(index + 5)) : ""
-                                }
-                            }
-                        }
-                    }
+    Column {
+        anchors.centerIn: parent
+        anchors.verticalCenterOffset: 60
+        spacing: 20
 
-                    Item { width: 18; height: 1 }
+        Button {
+            text: "Play Again"
+            width: 180; height: 55
+            font.pixelSize: 18
+            visible: isWin // Chỉ hiện khi phá đảo
+            onClicked: {
+                gameBoard.generateRandomPuzzle()
+                stackView.replace("ScreenGame.qml")
+            }
+        }
 
-                    Row {
-                        spacing: 0
-                        Repeater {
-                            model: 3
-                            delegate: Row {
-                                required property int index
-                                spacing: 0
-
-                                Item {
-                                    width: 56; height: 130
-
-                                    Rectangle {
-                                        x: -22; y: -2; width: 18; height: 18
-                                        color: "#888"; radius: 2
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: ["W","X","Y"][index]
-                                            color: "white"; font.pixelSize: 11
-                                            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-                                        }
-                                    }
-
-                                    LedDisplay {
-                                        x: 0; y: 0; width: 56; height: 96
-                                        interactive: false
-                                        ledIndex: index + 3
-                                    }
-
-                                    TopEODot {
-                                        x: (56 - width) / 2; y: 26 - height / 2
-                                        dotType: "even"
-                                        visible: root.hasStats && root.evenOdd(index + 3) === 0
-                                    }
-                                    TopEODot {
-                                        x: (56 - width) / 2; y: 69 - height / 2
-                                        dotType: "odd"
-                                        visible: root.hasStats && root.evenOdd(index + 3) === 1
-                                    }
-
-                                    // Counter cột tự động
-                                    Row {
-                                        y: 102
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        spacing: 0
-                                        TopCounterBox { val: root.hasStats ? String(root.colCount(index * 3))     : "" }
-                                        TopCounterBox { val: root.hasStats ? String(root.colCount(index * 3 + 1)) : "" }
-                                        TopCounterBox { val: root.hasStats ? String(root.colCount(index * 3 + 2)) : "" }
-                                    }
-                                }
-
-                                HArrowPairAuto {
-                                    visible: index < 2
-                                    width: visible ? 36 : 0
-                                    cmpVal: index < 2 ? root.hCmpVal(index + 2) : 0
-                                }
-                            }
-                        }
-                    }
-                }
+        Button {
+            text: "Main Menu"
+            width: 180; height: 55
+            font.pixelSize: 18
+            onClicked: {
+                stackView.pop(null);
             }
         }
     }

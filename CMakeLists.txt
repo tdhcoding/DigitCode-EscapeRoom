@@ -15,7 +15,12 @@ qt_add_qml_module(appDigitCode_SINGLE
     URI DigitCode_SINGLE
     VERSION 1.0
     QML_FILES
-        UI/Main.qml
+        UI/Main.qml             # Sẽ làm bộ khung StackView
+        UI/ScreenMenu.qml       # Màn hình chính
+        UI/ScreenReady.qml      # Màn hình chuẩn bị
+        UI/ScreenGame.qml       # File Main.qml cũ đổi tên thành file này
+        UI/ScreenResult.qml     # Màn hình Thắng/Thua
+
         UI/LedDisplay.qml
         UI/LogicButton.qml
         UI/CounterBox.qml

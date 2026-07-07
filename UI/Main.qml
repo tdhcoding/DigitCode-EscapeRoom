@@ -1,16 +1,17 @@
 import QtQuick
 import QtQuick.Controls
 
-Window {
-    id: root
+ApplicationWindow {
+    id: mainWindow
     width: 580
     height: 650
     visible: true
-    title: "Digit Code SINGLE"
+    title: "Digit Code SINGLE v5"
     color: "#ffffff"
 
-    BottomBoard {
-            anchors.fill: parent
-            anchors.margins: 10
-        }
+    StackView {
+        id: stackView
+        anchors.fill: parent
+        initialItem: "ScreenMenu.qml" // Khởi động lên là vào Menu đầu tiên
+    }
 }

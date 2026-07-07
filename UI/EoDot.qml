@@ -4,34 +4,23 @@ Rectangle {
     width: 24; height: 20
     radius: 4
     border.width: 1
+
+    // Thêm property để nhận giá trị từ hệ thống (truyền từ LedDisplay)
+    property int systemValue: -1
     property string dotType: "even"
-    property bool selected: false
-    property int autoVal: -1
-    property bool clickable: true
 
-    visible: autoVal === -1
-             || (autoVal === 0 && dotType === "even")
-             || (autoVal === 1 && dotType === "odd")
+    // CHỈ HIỆN KHI systemValue khác -1 (tức là đã được hệ thống trả về)
+    visible: systemValue !== -1
 
-    color: selected ? "#b066ff" : "#e0e0e0"
-    border.color: selected ? "#9a4cee" : "#cccccc"
-
-    signal tapped()
+    color: "#b066ff"
+    border.color: "#9a4cee"
 
     Text {
         anchors.centerIn: parent
         text: root.dotType === "even" ? ".." : "."
-        color: root.selected ? "#ffffff" : "#777777"
+        color: "#fff"
         font.pixelSize: 12
         font.bold: true
         font.letterSpacing: root.dotType === "even" ? 2 : 0
-    }
-    MouseArea {
-        anchors.fill: parent
-        enabled: root.clickable  // ← dùng clickable thay vì check autoVal
-        onClicked: {
-            root.selected = !root.selected
-            root.tapped()
-        }
     }
 }

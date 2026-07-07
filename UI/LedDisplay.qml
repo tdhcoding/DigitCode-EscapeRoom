@@ -11,8 +11,6 @@ Item {
     property int holdDuration: 1000
 
     property var segState: []
-    property alias isEvenSelected: dotEven.selected
-    property alias isOddSelected: dotOdd.selected
 
     Component.onCompleted: {
         segState = gameBoard.getSegState(root.ledIndex)
@@ -119,22 +117,4 @@ Item {
     VSegment { segIdx: 5; x: 0;  y: 8  }   // F
     HSegment { segIdx: 6; x: 9;  y: 43 }   // G
 
-    // Chấm chẵn/lẻ
-    EODot {
-        id: dotEven
-        x: (root.width - width) / 2
-        y: 26 - height / 2
-        dotType: "even"
-        visible: interactive
-        onTapped: { if (dotEven.selected) dotOdd.selected = false }
-    }
-
-    EODot {
-        id: dotOdd
-        x: (root.width - width) / 2
-        y: 69 - height / 2
-        dotType: "odd"
-        visible: interactive
-        onTapped: { if (dotOdd.selected) dotEven.selected = false }
-    }
 }
