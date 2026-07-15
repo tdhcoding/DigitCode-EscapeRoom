@@ -89,3 +89,9 @@ build-*/
 *.user.*
 .qmake.stash
 
+# Claude Code skill tooling (local, not project source)
+/.agents/
+/agent/
+/.claude/
+/skills-lock.json
+
