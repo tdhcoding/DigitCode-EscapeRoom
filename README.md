@@ -53,8 +53,8 @@ flowchart LR
 - **Game engine in C++/Qt** — a finite-state machine driving four clue types, a
   **constraint-based (Sudoku-like) puzzle generator**, a scoring/timer system, and a 2-strike
   verification rule, all wired through Qt signals & slots and exposed to QML via `Q_PROPERTY`.
-- **"Draw-to-guess" input** — the player draws each digit directly on the physical 7-segment
-  LEDs; the backend reverse-decodes segment patterns back into digits (`decodeDigitFromSegments`).
+- **"Draw-to-guess" mechanic** — the player draws each digit segment-by-segment on the LED board;
+  the backend reverse-decodes the segment pattern back into a digit (`decodeDigitFromSegments`).
 - **Robust ESP32 firmware** — non-blocking `millis()` scheduling, press-edge debounce,
   hold-to-confirm for destructive actions, and brownout self-recovery for the LED driver.
 
@@ -144,10 +144,13 @@ arduino-cli upload  --fqbn esp32:esp32:esp32 -p /dev/cu.usbserial-0001 firmware/
 
 ## Status
 
-Software is **complete and builds cleanly** (CMake, no errors). On hardware, the core blocks are
-verified on the real device (ESP32 over USB, OLED, both PCF8574 expanders on the dual I²C bus);
-the 7-segment LED display and full 38-key matrix are the remaining bring-up steps. See
-[`PROJECT_REPORT.md`](PROJECT_REPORT.md) for the full technical write-up.
+- **Software** — complete: a full game is playable end-to-end, and the project builds cleanly (CMake, no errors).
+- **Hardware display / mirroring** — verified on the real ESP32: the app drives the physical OLED
+  and MAX7219 7-segment displays in real time over the WebSocket link (the output path works).
+- **Remaining** — wiring the full 38-key button matrix so a game can also be *controlled* entirely
+  from the hardware panel.
+
+See [`PROJECT_REPORT.md`](PROJECT_REPORT.md) for the full technical write-up.
 
 ## Author
 
