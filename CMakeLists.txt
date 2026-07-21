@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(DigitCode_SINGLE VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick WebSockets Network)
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(appDigitCode_SINGLE
@@ -20,6 +20,7 @@ qt_add_qml_module(appDigitCode_SINGLE
         UI/ScreenReady.qml      # Màn hình chuẩn bị
         UI/ScreenGame.qml       # File Main.qml cũ đổi tên thành file này
         UI/ScreenResult.qml     # Màn hình Thắng/Thua
+        UI/ScreenRealLife.qml   # Màn hình chờ kết nối phần cứng (Play in Real-life)
 
         UI/LedDisplay.qml
         UI/LogicButton.qml
@@ -30,9 +31,6 @@ qt_add_qml_module(appDigitCode_SINGLE
         UI/DraftGrid.qml
 
         SOURCES backend/hardwareserver.h backend/hardwareserver.cpp
-        SOURCES backend/hardwareserver.cpp
-        SOURCES backend/hardwareserver.cpp
-        SOURCES backend/hardwareserver.cpp
 )
 
 set_target_properties(appDigitCode_SINGLE PROPERTIES

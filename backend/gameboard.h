@@ -97,6 +97,10 @@ private:
     void processQ3(const QString& btnId);
     void processQ4(const QString& btnId);
     void processReview(const QString& btnId);
+    // Review Q1/Q2 bằng nút T-Y lúc rảnh: dòng 1 = đáp án Q1 của nút vừa bấm,
+    // dòng 2 = đáp án Q2 của cặp (nút này + nút T-Y bấm ngay trước) nếu đã mua
+    void processReviewTarget(const QString& btnId);
+    int cmpValueForPair(const QString& pair) const; // tra đáp án so sánh Q2 theo cặp đã chuẩn hóa "T-U"
     void lockAndLightUpFull(const QString& btnId);
     void checkWinCondition();
 
@@ -104,6 +108,9 @@ private:
     bool isAdjacent(const QString& btn1, const QString& btn2);
     int getMaxLed(const QString& btnId);
     void revealClueToUI(const QString& type, const QString& id, const QVariant& value);
+    // Dò ngược DIGIT_MAP: 7 trạng thái segment -> chữ số 0-9, hoặc -1 nếu không khớp mẫu nào
+    // (dùng cho BTN_VERIFY: đọc mã đoán vẽ trên sa bàn LED thật thay vì gõ TextField)
+    int decodeDigitFromSegments(const QVariantList& segs) const;
 
     // --- BIẾN QUẢN LÝ LUẬT CHƠI (V4) ---
     int m_points;
@@ -117,6 +124,7 @@ private:
 
     // --- BIẾN LƯU VẾT & CHỐNG TRÙNG LẶP ---
     QString m_tempTarget1;
+    QString m_lastReviewTarget; // nút T-Y bấm gần nhất trong Review Mode (để ghép cặp xem lại Q2)
     QSet<QString> m_askedQ1;
     QSet<QString> m_askedQ2;
     QSet<QString> m_askedQ3;

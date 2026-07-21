@@ -67,6 +67,32 @@ Item {
             }
         }
 
+        // 3. NÚT CHƠI VỚI PHẦN CỨNG THẬT (mirror mode, không cho Pause)
+        Button {
+            text: "Play in Real-life"
+            width: 220; height: 55
+            font.pixelSize: 18
+
+            background: Rectangle {
+                color: hwServer.connected ? "#10b981" : "#ffffff"
+                border.color: "#ccc"; radius: 5
+            }
+            contentItem: Text {
+                text: parent.text
+                color: hwServer.connected ? "white" : "black"
+                font.pixelSize: 18
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            onClicked: {
+                if (root.hasSavedGame) {
+                    stackView.pop(null); // Hủy ván đang tạm dừng (giống New Single Challenge)
+                }
+                stackView.push("ScreenRealLife.qml")
+            }
+        }
+
         Button {
             text: "1v1 Challenge"
             width: 220; height: 55

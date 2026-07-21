@@ -95,3 +95,6 @@ build-*/
 /.claude/
 /skills-lock.json
 
+# Thông tin mạng thật (WiFi SSID/password) - xem secrets.h.example
+firmware/DigitCodeFirmware/secrets.h
+

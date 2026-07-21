@@ -17,6 +17,8 @@ int main(int argc, char *argv[])
 
     // BẬT SERVER MẠNG VÀ TRUYỀN CON TRỞ BOARD VÀO
     HardwareServer hwServer(&board);
+    // Expose cho màn hình "Play in Real-life" (trạng thái kết nối + IP server)
+    engine.rootContext()->setContextProperty("hwServer", &hwServer);
 
     QObject::connect(
         &engine,

@@ -1,0 +1,415 @@
+<title>DigitCode v6 — Sơ đồ đấu nối phần cứng</title>
+<style>
+  :root {
+    --bg: #eef1ee;
+    --panel: #e3e8e2;
+    --ink: #17211d;
+    --ink-dim: #4b5850;
+    --line: #46564d;
+    --line-soft: #9fada4;
+    --signal: #1f6e68;
+    --signal-soft: #cfe6e3;
+    --caution: #a85f1f;
+    --caution-soft: #f2e0cc;
+    --critical: #8a2f2a;
+    --critical-soft: #f2d9d6;
+    --radius: 10px;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #101613;
+    --panel: #161f1a;
+    --ink: #e6ece8;
+    --ink-dim: #9db0a6;
+    --line: #7e9389;
+    --line-soft: #3c4a43;
+    --signal: #5fc2b7;
+    --signal-soft: #1a3a37;
+    --caution: #e39a52;
+    --caution-soft: #3a2c1a;
+    --critical: #e28e88;
+    --critical-soft: #3a201e;
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #101613;
+      --panel: #161f1a;
+      --ink: #e6ece8;
+      --ink-dim: #9db0a6;
+      --line: #7e9389;
+      --line-soft: #3c4a43;
+      --signal: #5fc2b7;
+      --signal-soft: #1a3a37;
+      --caution: #e39a52;
+      --caution-soft: #3a2c1a;
+      --critical: #e28e88;
+      --critical-soft: #3a201e;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  body { padding: 2.5rem 1.25rem 5rem; }
+
+  .sheet { max-width: 1180px; margin: 0 auto; }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  header.title-block {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 1.5rem;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 1rem;
+    margin-bottom: 2.25rem;
+    flex-wrap: wrap;
+  }
+  header.title-block .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--signal);
+    font-weight: 600;
+  }
+  header.title-block h1 {
+    font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+    margin: 0.2rem 0 0;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  header.title-block .rev {
+    font-size: 0.8rem;
+    color: var(--ink-dim);
+    text-align: right;
+  }
+
+  h2 {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    border-bottom: 1px solid var(--line-soft);
+    padding-bottom: 0.5rem;
+    margin: 3rem 0 1.25rem;
+  }
+  h2 .num { color: var(--signal); margin-right: 0.5em; }
+
+  section:first-of-type h2 { margin-top: 0; }
+
+  .diagram-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 1rem;
+    overflow-x: auto;
+  }
+  svg.schematic { display: block; min-width: 900px; width: 100%; height: auto; }
+  svg text { fill: var(--ink); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  svg .block-label { font-size: 15px; font-weight: 600; font-family: ui-sans-serif, sans-serif; }
+  svg .sub-label { font-size: 11px; fill: var(--ink-dim); font-family: ui-sans-serif, sans-serif; }
+  svg .pin-label { font-size: 12px; }
+  svg .wire { stroke: var(--line); stroke-width: 1.5; fill: none; }
+  svg .wire.signal { stroke: var(--signal); stroke-width: 2; }
+  svg .block-rect { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; rx: 8; }
+  svg .block-rect.esp32 { stroke: var(--signal); stroke-width: 2; }
+  svg .pin-dot { fill: var(--signal); }
+
+  .matrix-wrap {
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    overflow-x: auto;
+  }
+  .matrix-grid {
+    display: grid;
+    grid-template-columns: 104px repeat(7, 84px);
+    gap: 6px;
+    width: max-content;
+    margin: 0 auto;
+  }
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 52px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    text-align: center;
+    line-height: 1.15;
+  }
+  .cell.axis {
+    background: transparent;
+    color: var(--ink-dim);
+    font-size: 0.72rem;
+    font-family: ui-monospace, monospace;
+  }
+  .cell.key {
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
+    font-weight: 600;
+    font-family: ui-monospace, monospace;
+  }
+  .cell.key.drawpad { background: var(--signal-soft); border-color: var(--signal); color: var(--signal); }
+  .cell.key.action-btn { background: var(--caution-soft); border-color: var(--caution); color: var(--caution); }
+  .cell.empty { background: transparent; border: 1px dashed var(--line-soft); opacity: 0.4; }
+
+  .legend { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 1rem; font-size: 0.8rem; color: var(--ink-dim); }
+  .legend .swatch { display: inline-block; width: 0.85em; height: 0.85em; border-radius: 3px; margin-right: 0.4em; vertical-align: -0.1em; }
+
+  table.pintable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  table.pintable th, table.pintable td {
+    text-align: left;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  table.pintable th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-dim);
+    font-weight: 600;
+  }
+  table.pintable td.pin { color: var(--signal); font-weight: 600; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  .warnings { display: flex; flex-direction: column; gap: 0.7rem; }
+  .warn {
+    border-left: 3px solid var(--caution);
+    background: var(--caution-soft);
+    border-radius: 0 6px 6px 0;
+    padding: 0.6rem 0.85rem;
+    font-size: 0.87rem;
+    line-height: 1.45;
+  }
+  .warn.critical { border-left-color: var(--critical); background: var(--critical-soft); }
+  .warn b { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.15rem; }
+  .warn.critical b { color: var(--critical); }
+  .warn:not(.critical) b { color: var(--caution); }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line-soft);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+  }
+</style>
+
+<div class="sheet">
+  <header class="title-block">
+    <div>
+      <div class="eyebrow">DigitCode — Escape Room Puzzle</div>
+      <h1>Sơ đồ đấu nối phần cứng v6</h1>
+    </div>
+    <div class="rev mono">ESP32 · 2× PCF8574 · MAX7219 · SSD1306<br />Rev. 2026-07-16</div>
+  </header>
+
+  <section>
+    <h2><span class="num">01</span>Sơ đồ khối &amp; bus tín hiệu</h2>
+    <div class="diagram-wrap">
+      <svg class="schematic" viewBox="0 0 1180 700" xmlns="http://www.w3.org/2000/svg">
+        <!-- ESP32 -->
+        <rect class="block-rect esp32" x="30" y="220" width="180" height="280"></rect>
+        <text class="block-label" x="120" y="255" text-anchor="middle">ESP32</text>
+        <text class="sub-label" x="120" y="272" text-anchor="middle">DevKit (Arduino core)</text>
+
+        <!-- ESP32 pin dots + labels (right edge, going to 4 peripherals) -->
+        <!-- I2C bus to OLED + 2x PCF8574 -->
+        <circle class="pin-dot" cx="210" cy="250" r="3"></circle>
+        <text class="pin-label" x="218" y="254">SDA·21</text>
+        <circle class="pin-dot" cx="210" cy="270" r="3"></circle>
+        <text class="pin-label" x="218" y="274">SCL·22</text>
+
+        <!-- MAX7219 -->
+        <circle class="pin-dot" cx="210" cy="330" r="3"></circle>
+        <text class="pin-label" x="218" y="334">DIN·23</text>
+        <circle class="pin-dot" cx="210" cy="350" r="3"></circle>
+        <text class="pin-label" x="218" y="354">CLK·18</text>
+        <circle class="pin-dot" cx="210" cy="370" r="3"></circle>
+        <text class="pin-label" x="218" y="374">CS·5</text>
+
+        <!-- power -->
+        <circle class="pin-dot" cx="210" cy="450" r="3"></circle>
+        <text class="pin-label" x="218" y="454">3V3</text>
+        <circle class="pin-dot" cx="210" cy="470" r="3"></circle>
+        <text class="pin-label" x="218" y="474">5V / VIN</text>
+
+        <!-- Wires: ESP32 -> OLED (top) -->
+        <path class="wire signal" d="M 300 250 H 340 V 120 H 420"></path>
+        <path class="wire signal" d="M 300 270 H 360 V 140 H 420"></path>
+
+        <!-- Wires: ESP32 -> MAX7219 (middle) -->
+        <path class="wire" d="M 300 330 H 340 V 300 H 420"></path>
+        <path class="wire" d="M 300 350 H 360 V 320 H 420"></path>
+        <path class="wire" d="M 300 370 H 380 V 340 H 420"></path>
+
+        <!-- Wires: ESP32 -> PCF8574 #1 (rows) + #2 (cols), shares I2C bus with OLED -->
+        <path class="wire signal" d="M 300 250 H 330 V 460 H 420"></path>
+        <path class="wire signal" d="M 300 270 H 350 V 480 H 420"></path>
+        <path class="wire signal" d="M 330 460 V 580 H 420"></path>
+        <path class="wire signal" d="M 350 480 V 600 H 420"></path>
+
+        <!-- Power rail label -->
+        <text class="sub-label" x="120" y="500" text-anchor="middle">5V/VIN → MAX7219 · 3V3 → OLED/PCF8574</text>
+
+        <!-- OLED block -->
+        <rect class="block-rect" x="420" y="70" width="220" height="100"></rect>
+        <text class="block-label" x="530" y="105" text-anchor="middle">SSD1306 OLED</text>
+        <text class="sub-label" x="530" y="122" text-anchor="middle">0.96" I2C · addr 0x3C</text>
+        <text class="pin-label" x="435" y="150">SDA</text>
+        <text class="pin-label" x="500" y="150">SCL</text>
+        <text class="pin-label" x="565" y="150">VCC 3V3</text>
+
+        <!-- MAX7219 block -->
+        <rect class="block-rect" x="420" y="250" width="220" height="110"></rect>
+        <text class="block-label" x="530" y="285" text-anchor="middle">MAX7219</text>
+        <text class="sub-label" x="530" y="302" text-anchor="middle">Điều khiển 6×LED 7-đoạn</text>
+        <text class="pin-label" x="432" y="330">DIN</text>
+        <text class="pin-label" x="480" y="330">CLK</text>
+        <text class="pin-label" x="525" y="330">CS</text>
+        <text class="pin-label" x="565" y="330" fill="var(--critical)">VCC 5V!</text>
+
+        <!-- PCF8574 #1 (ROWS) block -->
+        <rect class="block-rect" x="420" y="420" width="220" height="90"></rect>
+        <text class="block-label" x="530" y="448" text-anchor="middle">PCF8574 #1 — HÀNG</text>
+        <text class="sub-label" x="530" y="464" text-anchor="middle">addr 0x20 (mặc định)</text>
+        <text class="pin-label" x="435" y="490">SDA</text>
+        <text class="pin-label" x="500" y="490">SCL</text>
+
+        <!-- PCF8574 #2 (COLS) block -->
+        <rect class="block-rect" x="420" y="540" width="220" height="90"></rect>
+        <text class="block-label" x="530" y="568" text-anchor="middle">PCF8574 #2 — CỘT</text>
+        <text class="sub-label" x="530" y="584" text-anchor="middle">addr 0x21 (đổi jumper A0)</text>
+        <text class="pin-label" x="435" y="610">SDA</text>
+        <text class="pin-label" x="500" y="610">SCL</text>
+
+        <!-- PCF8574 -> matrix fan-out -->
+        <path class="wire" d="M 640 460 H 700"></path>
+        <path class="wire" d="M 640 580 H 700"></path>
+        <text class="pin-label" x="650" y="455">P0-P5 (hàng)</text>
+        <text class="pin-label" x="650" y="575">P0-P6 (cột)</text>
+
+        <!-- Matrix block -->
+        <rect class="block-rect" x="700" y="410" width="440" height="240" stroke-dasharray="4 3"></rect>
+        <text class="block-label" x="920" y="440" text-anchor="middle">Ma trận phím 6×7 (38 nút)</text>
+        <text class="sub-label" x="920" y="457" text-anchor="middle">Chi tiết ở Mục 02 bên dưới</text>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>Ma trận phím — 6 hàng × 7 cột</h2>
+    <div class="matrix-wrap">
+      <div class="matrix-grid" id="matrixGrid"></div>
+      <div class="legend">
+        <span><span class="swatch" style="background:var(--bg);border:1px solid var(--line-soft);"></span>Nút ACTION thường</span>
+        <span><span class="swatch" style="background:var(--caution-soft);border:1px solid var(--caution);"></span>Q1-4 / VERIFY / PAUSE</span>
+        <span><span class="swatch" style="background:var(--signal-soft);border:1px solid var(--signal);"></span>Drawing Pad (segIdx A-G)</span>
+        <span><span class="swatch" style="border:1px dashed var(--line-soft);"></span>Ô trống, không dùng</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>Bảng pin &amp; cảnh báo</h2>
+    <div class="two-col">
+      <div>
+        <table class="pintable mono">
+          <thead>
+            <tr><th>Tín hiệu</th><th>GPIO</th><th>Đích</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>I2C SDA</td><td class="pin">21</td><td>OLED + 2× PCF8574</td></tr>
+            <tr><td>I2C SCL</td><td class="pin">22</td><td>OLED + 2× PCF8574</td></tr>
+            <tr><td>MAX7219 DIN</td><td class="pin">23</td><td>MAX7219</td></tr>
+            <tr><td>MAX7219 CLK</td><td class="pin">18</td><td>MAX7219</td></tr>
+            <tr><td>MAX7219 CS</td><td class="pin">5</td><td>MAX7219</td></tr>
+            <tr><td>Nguồn MAX7219</td><td class="pin">5V/VIN</td><td>không dùng 3V3</td></tr>
+            <tr><td>Nguồn OLED/PCF8574</td><td class="pin">3V3</td><td>—</td></tr>
+            <tr><td>GND</td><td class="pin">—</td><td>rail chung</td></tr>
+            <tr><td>PCF8574 #1 (hàng)</td><td class="pin">0x20</td><td>jumper A0-A2 mặc định</td></tr>
+            <tr><td>PCF8574 #2 (cột)</td><td class="pin">0x21</td><td>đổi 1 jumper (vd A0)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="warnings">
+        <div class="warn critical"><b>Cháy chip</b>Đấu ngược VCC/GND trên OLED hoặc PCF8574 — đối chiếu ký hiệu trên module trước khi cắm.</div>
+        <div class="warn critical"><b>Thiếu điện áp</b>Không cấp nguồn MAX7219 từ chân 3.3V (cần tối thiểu 4V) — lấy 5V từ VIN.</div>
+        <div class="warn"><b>Lệch mức logic</b>MAX7219 nhận 3.3V ở DIN/CLK/CS — giữ dây ngắn &lt;20cm, thêm level-shifter nếu LED nhòe.</div>
+        <div class="warn"><b>Trùng địa chỉ I2C</b>2 module PCF8574 phải khác địa chỉ — đổi 1 jumper A0-A2, chạy i2c_scanner nhiều lần xác nhận ổn định (địa chỉ nhảy loạn = jumper tiếp xúc lỏng).</div>
+        <div class="warn"><b>GND chung</b>Mọi module phải chia sẻ 1 rail GND — đo thông mạch trước khi cấp nguồn.</div>
+        <div class="warn"><b>Ngắn mạch ma trận</b>Đấu và test từng hàng một qua Serial Monitor, tránh lệch chân breadboard.</div>
+        <div class="warn"><b>Dòng nguồn USB</b>Dùng cổng sạc 5V/1A+, tránh brownout reset giữa ván chơi.</div>
+        <div class="warn"><b>Trở kéo I2C</b>Cần 4.7kΩ lên 3.3V nếu dùng IC trần không có sẵn pull-up (module PCF8574 rời thường đã có sẵn).</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Nguồn chân lý chi tiết: <span class="mono">docs/hardware/schematic.md</span> · Firmware tham chiếu: <span class="mono">firmware/DigitCodeFirmware/DigitCodeFirmware.ino</span>
+  </footer>
+</div>
+
+<script>
+  const ROWS = [
+    { pin: "PCF1·P0", cells: [["BTN_Q1","action-btn"],["BTN_Q2","action-btn"],["BTN_Q3","action-btn"],["BTN_Q4","action-btn"],["VERIFY","action-btn"],["PAUSE","action-btn"],[null,null]] },
+    { pin: "PCF1·P1", cells: [["T",null],["U",null],["V",null],["W",null],["X",null],["Y",null],[null,null]] },
+    { pin: "PCF1·P2", cells: [["A·seg","drawpad"],["B·seg","drawpad"],["C·seg","drawpad"],["D·seg","drawpad"],["E·seg","drawpad"],["F·seg","drawpad"],["G·seg","drawpad"]] },
+    { pin: "PCF1·P3", cells: [["A",null],["B",null],["C",null],["D",null],["E",null],["F",null],["G",null]] },
+    { pin: "PCF1·P4", cells: [["H",null],["I",null],["J",null],["K",null],["L",null],["M",null],["N",null]] },
+    { pin: "PCF1·P5", cells: [["O",null],["P",null],["Q",null],["R",null],["S",null],[null,null],[null,null]] },
+  ];
+  const COL_PINS = ["PCF2·P0","PCF2·P1","PCF2·P2","PCF2·P3","PCF2·P4","PCF2·P5","PCF2·P6"];
+
+  const grid = document.getElementById("matrixGrid");
+  const corner = document.createElement("div");
+  corner.className = "cell axis";
+  grid.appendChild(corner);
+  COL_PINS.forEach(p => {
+    const d = document.createElement("div");
+    d.className = "cell axis";
+    d.textContent = p;
+    grid.appendChild(d);
+  });
+  ROWS.forEach(row => {
+    const rowLabel = document.createElement("div");
+    rowLabel.className = "cell axis";
+    rowLabel.textContent = row.pin;
+    grid.appendChild(rowLabel);
+    row.cells.forEach(([label, cls]) => {
+      const d = document.createElement("div");
+      if (label === null) {
+        d.className = "cell empty";
+      } else {
+        d.className = "cell key" + (cls ? " " + cls : "");
+        d.textContent = label;
+      }
+      grid.appendChild(d);
+    });
+  });
+</script>

@@ -3,6 +3,7 @@ import QtQuick.Controls
 
 Item {
     id: root
+    objectName: "screenGame" // để Main.qml nhận diện màn hình hiện tại khi phần cứng bấm NEW GAME
 
     // --- BIẾN LƯU TRỮ MANH MỐI TỪ C++ ---
     property var revealedQ1: ({})
@@ -10,6 +11,8 @@ Item {
     property var revealedQ3: ({})
     property var revealedQ4: ({})
     property bool gameActive: false
+    // Chế độ "Play in Real-life": chơi cùng phần cứng thật, không cho phép Pause
+    property bool realLifeMode: false
     property string oledMsg1: "Time is ticking..."
     property string oledMsg2: ""
 
@@ -54,6 +57,8 @@ Item {
         anchors.left: parent.left
         anchors.margins: 15
         width: 140; height: 35; z: 100
+        // Real-life mode: không cho Pause giữa ván (chỉ hiện lại khi ván đã kết thúc)
+        visible: !root.realLifeMode || !root.gameActive
 
         background: Rectangle {
             color: root.gameActive ? "#6b7280" : "#374151" // Khi review nút sẽ có màu tối hơn
@@ -98,8 +103,15 @@ Item {
         }
 
         Text {
-            anchors.centerIn: parent; color: "#ffb700"; font.pixelSize: 15; font.bold: true
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"; horizontalAlignment: Text.AlignHCenter
+            // Giới hạn vùng text ở giữa: chừa khối TIME/PTS bên trái và cụm Q1-Q4
+            // bên phải, tránh chữ dài chui xuống dưới nút (bug từng thấy thực tế)
+            anchors.left: parent.left; anchors.leftMargin: 160
+            anchors.right: parent.right; anchors.rightMargin: 215
+            anchors.verticalCenter: parent.verticalCenter
+            color: "#ffb700"; font.pixelSize: 15; font.bold: true
+            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
             text: root.oledMsg1 + (root.oledMsg2 !== "" ? "\n" + root.oledMsg2 : "")
         }
 
@@ -258,5 +270,177 @@ Item {
 
         onOpened: closeDeniedTimer.start()
         onClosed: closeDeniedTimer.stop()
+    }
+
+    // --- 7. CHÚ GIẢI 4 CÂU HỎI (góc dưới trái) ---
+    Column {
+        anchors.left: parent.left
+        anchors.leftMargin: 12
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 12
+        spacing: 2
+        z: 5
+
+        Repeater {
+            model: [
+                "Q1 Even/Odd  - 1 LED",
+                "Q2 Compare   - 2 LEDs",
+                "Q3 Count     - 1 row/col",
+                "Q4 Full check- 2 rows/cols"
+            ]
+            delegate: Text {
+                text: modelData
+                font.pixelSize: 10
+                color: "#6b7280"
+                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            }
+        }
+        Text {
+            text: "-5 pts each"
+            font.pixelSize: 10; font.italic: true
+            color: "#9ca3af"
+            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+        }
+    }
+
+    // --- 8. NÚT SETTINGS (bánh răng, góc dưới phải) ---
+    Button {
+        id: btnSettings
+        anchors.right: parent.right
+        anchors.rightMargin: 15
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 15
+        width: 44; height: 44; z: 10
+
+        background: Rectangle { color: "#374151"; radius: 22 }
+        contentItem: Text {
+            text: "⚙" // ⚙
+            color: "white"; font.pixelSize: 24
+            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+        }
+        onClicked: settingsPopup.open()
+    }
+
+    Popup {
+        id: settingsPopup
+        width: 260
+        height: settingsColumn.implicitHeight + 40
+        anchors.centerIn: parent
+        modal: true; focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle { color: "#f9fafb"; radius: 10; border.color: "#d1d5db"; border.width: 2 }
+
+        Column {
+            id: settingsColumn
+            anchors.centerIn: parent
+            spacing: 12
+
+            Text {
+                text: "SETTINGS"
+                font.pixelSize: 16; font.bold: true; color: "#374151"
+                anchors.horizontalCenter: parent.horizontalCenter
+                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            }
+
+            Button {
+                text: "Rules"
+                width: 200; height: 42
+                anchors.horizontalCenter: parent.horizontalCenter
+                background: Rectangle { color: "#ffffff"; border.color: "#ccc"; radius: 5 }
+                contentItem: Text { text: parent.text; color: "black"; font.pixelSize: 15; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                onClicked: { settingsPopup.close(); rulesPopup.open() }
+            }
+
+            Button {
+                // Real-life mode đang chơi: không có Exit (Exit = pause trá hình)
+                visible: !root.realLifeMode || !root.gameActive
+                text: root.gameActive ? "Pause & Exit to Menu" : "Exit to Menu"
+                width: 200; height: 42
+                anchors.horizontalCenter: parent.horizontalCenter
+                background: Rectangle { color: "#6b7280"; radius: 5 }
+                contentItem: Text { text: parent.text; color: "white"; font.bold: true; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                onClicked: {
+                    settingsPopup.close()
+                    if (root.gameActive) {
+                        gameBoard.pauseGame();
+                        stackView.push("ScreenMenu.qml", { "hasSavedGame": true });
+                    } else {
+                        stackView.pop(null);
+                    }
+                }
+            }
+
+            Button {
+                text: "Close"
+                width: 200; height: 36
+                anchors.horizontalCenter: parent.horizontalCenter
+                background: Rectangle { color: "transparent"; border.color: "#d1d5db"; radius: 5 }
+                contentItem: Text { text: parent.text; color: "#6b7280"; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                onClicked: settingsPopup.close()
+            }
+        }
+    }
+
+    // --- 9. POPUP LUẬT CHƠI ---
+    Popup {
+        id: rulesPopup
+        width: 480; height: 540
+        anchors.centerIn: parent
+        modal: true; focus: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle { color: "#1f2937"; radius: 10; border.color: "#4b5563"; border.width: 2 }
+
+        Flickable {
+            anchors.fill: parent
+            anchors.margins: 18
+            contentHeight: rulesText.implicitHeight
+            clip: true
+
+            Text {
+                id: rulesText
+                width: parent.width
+                wrapMode: Text.WordWrap
+                color: "#e5e7eb"
+                font.pixelSize: 12
+                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+                lineHeight: 1.35
+                text:
+                    "== GOAL ==\n" +
+                    "Crack the hidden 6-digit code and draw it onto the board.\n\n" +
+                    "== BOARD ==\n" +
+                    "6 LEDs named T U V / W X Y (2 rows x 3 cols).\n" +
+                    "Buttons A-I address columns of segments, J-S address rows.\n\n" +
+                    "== CLUES (-5 pts each) ==\n" +
+                    "Q1 Even/Odd : pick 1 LED (T-Y), get its parity dot.\n" +
+                    "Q2 Compare  : pick 2 adjacent LEDs, get < or >.\n" +
+                    "Q3 Count    : pick 1 row/col (A-S), get number of lit\n" +
+                    "              segments. If maxed, the group locks ON.\n" +
+                    "Q4 Full     : pick 2 rows/cols, learn FULL / NOT FULL.\n" +
+                    "You have 10s to pick a target after pressing Q1-Q4,\n" +
+                    "or you lose 1 pt and the request is cancelled.\n\n" +
+                    "== TIME & POINTS ==\n" +
+                    "Start with 100 pts. Every 60s costs 1 pt.\n" +
+                    "Reach 0 pts and you die.\n\n" +
+                    "== REVIEW (free) ==\n" +
+                    "While idle, press A-S or T-Y to re-read clues you own.\n" +
+                    "Press 2 adjacent T-Y buttons to re-read their compare.\n\n" +
+                    "== VERIFY (2 strikes) ==\n" +
+                    "Draw all 6 digits on the board, then press VERIFY.\n" +
+                    "1st wrong guess: warning. 2nd wrong guess: game over.\n\n" +
+                    "== REAL-LIFE MODE ==\n" +
+                    "Play with the physical board. No pause. Hold the\n" +
+                    "physical NEW GAME button 5s to restart."
+            }
+        }
+
+        Button {
+            text: "✕"
+            anchors.top: parent.top
+            anchors.right: parent.right
+            width: 30; height: 30
+            background: Rectangle { color: "transparent" }
+            contentItem: Text { text: parent.text; color: "#9ca3af"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            onClicked: rulesPopup.close()
+        }
     }
 }

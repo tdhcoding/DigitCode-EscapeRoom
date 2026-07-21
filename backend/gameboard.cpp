@@ -157,6 +157,49 @@ void GameBoard::tapDrawingPad(int segIdx) {
 
 //Step2 ---- handleButtonPress
 void GameBoard::handleButtonPress(const QString& source, const QString& btnId) {
+    // 0. Các nút chỉ dành cho phần cứng (VERIFY vẽ trên sa bàn, NEW GAME vật lý) —
+    // hoạt động bất kể m_currentState đang là gì, giống BTN_Q1-4.
+    // BTN_NEWGAME chỉ được firmware gửi sau khi giữ nút 5 giây (chống bấm nhầm).
+    if (btnId == "BTN_NEWGAME") {
+        generateRandomPuzzle();
+        return;
+    }
+
+    // Nút vật lý bấm được mọi lúc (khác nút QML bị ẩn theo màn hình): nếu chưa
+    // từng sinh ván nào thì các bảng đáp án còn rỗng, xử lý tiếp sẽ truy cập
+    // index ngoài biên -> crash. Chặn tất cả trừ BTN_NEWGAME ở trên.
+    if (m_ansEvenOdd.isEmpty()) {
+        emit oledUpdateRequested("No game running", "Hold NEW GAME 5s");
+        m_oledClearTimer->start(3000);
+        return;
+    }
+
+    if (btnId == "BTN_VERIFY") {
+        // Không còn ván đang chạy (chưa bắt đầu / đã thắng-thua xong): từ chối,
+        // nếu không mọi mã đoán đều "sai" so với m_secretCode rỗng -> strike oan.
+        if (m_secretCode.isEmpty()) {
+            emit oledUpdateRequested("No active game", "Hold NEW GAME 5s");
+            m_oledClearTimer->start(3000);
+            return;
+        }
+
+        QString guess;
+        bool valid = true;
+        for (int i = 0; i < 6; i++) {
+            int digit = decodeDigitFromSegments(getSegState(i));
+            if (digit == -1) { valid = false; break; }
+            guess += QString::number(digit);
+        }
+
+        if (valid) {
+            verifyCode(guess);
+        } else {
+            emit oledUpdateRequested("INVALID CODE", "Draw digit 0-9 first");
+            m_oledClearTimer->start(3000);
+        }
+        return;
+    }
+
     // 1. Cho phép "bẻ lái" sang câu hỏi khác bất cứ lúc nào (Override)
     if (btnId == "BTN_Q1" || btnId == "BTN_Q2" || btnId == "BTN_Q3" || btnId == "BTN_Q4") {
 
@@ -182,10 +225,12 @@ void GameBoard::handleButtonPress(const QString& source, const QString& btnId) {
         return; // Xử lý xong thì dừng luôn, chờ người chơi bấm tiếp
     }
 
-    // 2. Chế độ Review Mode (Chỉ chạy khi đang rảnh rỗi và bấm vào nút A-S)
+    // 2. Chế độ Review Mode (Chỉ chạy khi đang rảnh rỗi)
     if (m_currentState == DEFAULT) {
         if (btnId >= "A" && btnId <= "S") {
             processReview(btnId);
+        } else if (btnId >= "T" && btnId <= "Y") {
+            processReviewTarget(btnId); // xem lại Q1 (và Q2 nếu bấm 2 nút liền kề liên tiếp)
         }
         return;
     }
@@ -208,7 +253,8 @@ void GameBoard::processQ1(const QString& btnId) {
 
     // Kiểm tra trùng lặp
     if (m_askedQ1.contains(btnId)) {
-        emit oledUpdateRequested("Forget? Find it in your mind...", "Or my mind I guess...");
+        emit oledUpdateRequested("Forget? Find it in ur mind", "Or in my mind I guess...");
+        m_oledClearTimer->start(3000); // nhánh duy nhất từng thiếu dòng này -> OLED treo message vĩnh viễn
         m_currentState = DEFAULT;
         m_penaltyTimer->stop();
         return;
@@ -220,10 +266,13 @@ void GameBoard::processQ1(const QString& btnId) {
     m_points -= 5;
     emit pointsChanged();
 
-    emit oledUpdateRequested("Done", "");
+    // In đáp án thật lên OLED (0 = chẵn, 1 = lẻ) — người chơi thuần phần cứng
+    // không thấy được chấm EODot bên QML nên OLED phải mang đủ thông tin.
+    int index = QString("TUVWXYZ").indexOf(btnId);
+    bool isOdd = m_ansEvenOdd[index].toInt() == 1;
+    emit oledUpdateRequested(QString("%1: %2").arg(btnId, isOdd ? "ODD (.)" : "EVEN (..)"), "");
 
     // Gửi tín hiệu sang QML để bật đèn EODot
-    int index = QString("TUVWXYZ").indexOf(btnId);
     revealClueToUI("Q1_EODOT", btnId, m_ansEvenOdd[index]);
 
     m_oledClearTimer->start(3000);
@@ -250,7 +299,7 @@ void GameBoard::processQ2(const QString& btnId) {
         QString pair = (m_tempTarget1 < btnId) ? (m_tempTarget1 + "-" + btnId) : (btnId + "-" + m_tempTarget1);
 
         if (m_askedQ2.contains(pair)) {
-            emit oledUpdateRequested("Forget? Find it in your mind...", "Or my mind I guess...");
+            emit oledUpdateRequested("Forget? Find it in ur mind", "Or in my mind I guess...");
             m_oledClearTimer->start(3000);
             m_currentState = DEFAULT;
             m_penaltyTimer->stop();
@@ -262,17 +311,12 @@ void GameBoard::processQ2(const QString& btnId) {
         m_points -= 5;
         emit pointsChanged();
 
-        emit oledUpdateRequested("Done", "");
+        int val = cmpValueForPair(pair);
 
-        // Gửi UI cập nhật Arrow
-        int val = 0;
-        if (pair == "T-U") val = m_ansHCmp[0].toInt();
-        else if (pair == "U-V") val = m_ansHCmp[1].toInt();
-        else if (pair == "W-X") val = m_ansHCmp[2].toInt();
-        else if (pair == "X-Y") val = m_ansHCmp[3].toInt();
-        else if (pair == "T-W") val = m_ansVCmp[0].toInt();
-        else if (pair == "U-X") val = m_ansVCmp[1].toInt();
-        else if (pair == "V-Y") val = m_ansVCmp[2].toInt();
+        // In đáp án thật lên OLED — người chơi thuần phần cứng không thấy
+        // được mũi tên CmpArrow bên QML nên OLED phải mang đủ thông tin.
+        QString rel = val > 0 ? ">" : (val < 0 ? "<" : "=");
+        emit oledUpdateRequested(QString("%1 %2 %3").arg(pair.left(1), rel, pair.right(1)), "");
 
         revealClueToUI("Q2_ARROW", pair, val);
 
@@ -285,7 +329,7 @@ void GameBoard::processQ3(const QString& btnId) {
     if (btnId < "A" || btnId > "S") return;
 
     if (m_askedQ3.contains(btnId) || m_lockedFull.contains(btnId)) {
-        emit oledUpdateRequested("Forget? Find it in your mind...", "Or my mind I guess...");
+        emit oledUpdateRequested("Forget? Find it in ur mind", "Or in my mind I guess...");
         m_oledClearTimer->start(3000);
         m_currentState = DEFAULT;
         m_penaltyTimer->stop();
@@ -403,6 +447,7 @@ void GameBoard::generateRandomPuzzle() {
 
     m_currentState = DEFAULT;
     m_tempTarget1.clear();
+    m_lastReviewTarget.clear();
     m_askedQ1.clear();
     m_askedQ2.clear();
     m_askedQ3.clear();
@@ -514,6 +559,24 @@ void GameBoard::generateRandomPuzzle() {
     emit puzzleGenerated();
 }
 
+int GameBoard::decodeDigitFromSegments(const QVariantList& segs) const {
+    if (segs.size() != 7) return -1;
+
+    // Chuẩn hóa: coi mọi giá trị khác 0 (kể cả trạng thái "hold"=2) là sáng,
+    // vì DIGIT_MAP chỉ mô tả mẫu 0/1.
+    QVariantList normalized;
+    for (const QVariant& v : segs) {
+        normalized.append(v.toInt() != 0 ? 1 : 0);
+    }
+
+    for (auto it = DIGIT_MAP.constBegin(); it != DIGIT_MAP.constEnd(); ++it) {
+        if (it.value().toList() == normalized) {
+            return it.key().digitValue();
+        }
+    }
+    return -1;
+}
+
 void GameBoard::revealClueToUI(const QString& type, const QString& id, const QVariant& value) {
     // In ra console để debug xem C++ có bắn đúng không
     qDebug() << "[REVEAL CLUE] Type:" << type << "| Target:" << id << "| Value:" << value;
@@ -545,7 +608,7 @@ void GameBoard::processQ4(const QString& btnId) {
         bool btn2_locked = m_askedQ3.contains(btnId) || m_lockedFull.contains(btnId);
 
         if (btn1_locked || btn2_locked) {
-            emit oledUpdateRequested("Forget? Find it in your mind...", "Or my mind I guess...");
+            emit oledUpdateRequested("Forget? Find it in ur mind", "Or in my mind I guess...");
             m_oledClearTimer->start(3000);
             m_currentState = DEFAULT;
             m_penaltyTimer->stop();
@@ -619,6 +682,49 @@ void GameBoard::processReview(const QString& btnId) {
         emit oledUpdateRequested("No cheating...", "");
         m_oledClearTimer->start(3000);
     }
+}
+
+int GameBoard::cmpValueForPair(const QString& pair) const {
+    // pair đã chuẩn hóa alphabetical, ví dụ "T-U" (không bao giờ "U-T")
+    if (pair == "T-U") return m_ansHCmp[0].toInt();
+    if (pair == "U-V") return m_ansHCmp[1].toInt();
+    if (pair == "W-X") return m_ansHCmp[2].toInt();
+    if (pair == "X-Y") return m_ansHCmp[3].toInt();
+    if (pair == "T-W") return m_ansVCmp[0].toInt();
+    if (pair == "U-X") return m_ansVCmp[1].toInt();
+    if (pair == "V-Y") return m_ansVCmp[2].toInt();
+    return 0;
+}
+
+void GameBoard::processReviewTarget(const QString& btnId) {
+    // Không trừ điểm, không dùng timer — giống Review A-S.
+    // Dòng 1: đáp án Q1 của LED vừa bấm (nếu đã mua)
+    QString line1;
+    if (m_askedQ1.contains(btnId)) {
+        int index = QString("TUVWXY").indexOf(btnId);
+        bool isOdd = m_ansEvenOdd[index].toInt() == 1;
+        line1 = QString("%1: %2").arg(btnId, isOdd ? "ODD (.)" : "EVEN (..)");
+    } else {
+        line1 = QString("%1: No cheating...").arg(btnId);
+    }
+
+    // Dòng 2: đáp án Q2 của cặp (nút này + nút T-Y bấm ngay trước đó) nếu cặp đã mua.
+    // Muốn xem lại cặp W-X: bấm W rồi bấm X.
+    QString line2;
+    if (!m_lastReviewTarget.isEmpty() && m_lastReviewTarget != btnId) {
+        QString pair = (m_lastReviewTarget < btnId)
+                           ? (m_lastReviewTarget + "-" + btnId)
+                           : (btnId + "-" + m_lastReviewTarget);
+        if (m_askedQ2.contains(pair)) {
+            int val = cmpValueForPair(pair);
+            QString rel = val > 0 ? ">" : (val < 0 ? "<" : "=");
+            line2 = QString("%1 %2 %3").arg(pair.left(1), rel, pair.right(1));
+        }
+    }
+    m_lastReviewTarget = btnId;
+
+    emit oledUpdateRequested(line1, line2);
+    m_oledClearTimer->start(3000);
 }
 
 // ==========================================================
