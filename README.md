@@ -20,8 +20,21 @@ state — every button press on the hardware is processed by the software's rule
 change (LED segments, OLED messages, score, timer) is pushed back down to the hardware. The goal
 was to turn a purely-software "digital board" into a device you can actually touch.
 
-<!-- TODO: add a photo/GIF of the hardware + app side by side — this is the single biggest
-     upgrade for a first-time visitor. Put it here:  ![demo](docs/demo.gif)  -->
+## How a round plays
+
+You start with **100 points** and a running clock. Points are the resource: the game is about
+buying just enough information to deduce the secret before you run out.
+
+1. **Ask a question.** Four clue types, each a different kind of deduction — `Q1` parity
+   (odd/even), `Q2` comparison, `Q3` counting, `Q4` full check. Pressing one moves the engine
+   into a `WAIT_*` state; you then choose which digit the question applies to.
+2. **Pay for it.** A valid clue costs **5 points**, and the clock itself costs **1 point per
+   minute**. Hesitation is priced too: press a question and fail to pick a target within
+   10 seconds, and it costs you a point.
+3. **Draw your answer.** Enter each digit by painting its individual segments on the 7-segment
+   board — the backend reverse-decodes the segment pattern back into a digit.
+4. **Verify.** A first wrong guess triggers a 4-second flashing warning; a second ends the game.
+   Guess right and the clock stops.
 
 ## System architecture
 
