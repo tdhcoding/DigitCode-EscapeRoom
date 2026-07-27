@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Shapes
 
 Item {
     id: root
@@ -25,96 +24,59 @@ Item {
         }
     }
 
-    readonly property real opOn:  0.85
-    readonly property real opOff: 0.08
-
+    // Tông tối: nét ĐÃ VẼ (state 1) = hổ phách, nét KHOÁ (state 2) = đỏ, TẮT = mờ nền.
     function segColor(idx) {
-        return segState[idx] === 2 ? "#ef4444" : "#111111"
+        if (segState[idx] === 2) return "#e5484d"   // khoá (Q3 full)
+        if (segState[idx] > 0)   return "#ffb000"   // đã vẽ
+        return "#241a05"                             // tắt (mờ)
     }
-
-    function segOpacity(idx) {
-        return segState[idx] > 0 ? opOn : opOff
+    function segGlow(idx) {
+        return segState[idx] > 0
     }
 
     function tapSeg(idx) {
         if (!interactive) return
         gameBoard.tapSegment(ledIndex, idx)
     }
-
     function holdSeg(idx) {
         if (!interactive) return
         gameBoard.holdSegment(ledIndex, idx)
     }
-
     function turnOnGroup(segs)          { gameBoard.turnOnGroupQml(ledIndex, segs) }
     function restoreGroup(segs, backup) { gameBoard.restoreGroupQml(ledIndex, segs, backup) }
 
-    component HSegment: Shape {
+    // Segment bo tròn (Rectangle radius) thay cho Shape lục giác — theo layout redesign.
+    component RSeg: Rectangle {
         property int segIdx: 0
-        width: 38; height: 10
-        opacity: root.segOpacity(segIdx)
-        ShapePath {
-            fillColor: root.segColor(segIdx)  // ← đổi parent.segIdx thành segIdx
-            strokeColor: "transparent"
-            startX: 3.8; startY: 0
-            PathLine { x: 34.2; y: 0  }
-            PathLine { x: 38;   y: 5  }
-            PathLine { x: 34.2; y: 10 }
-            PathLine { x: 3.8;  y: 10 }
-            PathLine { x: 0;    y: 5  }
-            PathLine { x: 3.8;  y: 0  }
+        radius: Math.min(width, height) / 2
+        color: root.segColor(segIdx)
+        antialiasing: true
+        // Glow nhẹ khi sáng (nhiều lớp Rectangle mờ = tương đương MultiEffect nhẹ)
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width + 6; height: parent.height + 6
+            radius: parent.radius + 3
+            color: "transparent"
+            border.width: 3
+            border.color: "#ffb000"
+            opacity: root.segGlow(parent.segIdx) ? 0.18 : 0
+            antialiasing: true
         }
         MouseArea {
             anchors.fill: parent
+            anchors.margins: -2
             pressAndHoldInterval: root.holdDuration
             property bool wasHeld: false
-            onPressAndHold: {
-                wasHeld = true
-                root.holdSeg(parent.segIdx)
-            }
-            onReleased: {
-                if (!wasHeld) root.tapSeg(parent.segIdx)
-                wasHeld = false
-            }
+            onPressAndHold: { wasHeld = true; root.holdSeg(parent.segIdx) }
+            onReleased: { if (!wasHeld) root.tapSeg(parent.segIdx); wasHeld = false }
         }
     }
 
-    component VSegment: Shape {
-        property int segIdx: 0
-        width: 10; height: 38
-        opacity: root.segOpacity(segIdx)
-        ShapePath {
-            fillColor: root.segColor(segIdx)  // ← đổi parent.segIdx thành segIdx
-            strokeColor: "transparent"
-            startX: 0; startY: 3.8
-            PathLine { x: 5;  y: 0    }
-            PathLine { x: 10; y: 3.8  }
-            PathLine { x: 10; y: 34.2 }
-            PathLine { x: 5;  y: 38   }
-            PathLine { x: 0;  y: 34.2 }
-            PathLine { x: 0;  y: 3.8  }
-        }
-        MouseArea {
-            anchors.fill: parent
-            pressAndHoldInterval: root.holdDuration
-            property bool wasHeld: false
-            onPressAndHold: {
-                wasHeld = true
-                root.holdSeg(parent.segIdx)
-            }
-            onReleased: {
-                if (!wasHeld) root.tapSeg(parent.segIdx)
-                wasHeld = false
-            }
-        }
-    }
-
-    HSegment { segIdx: 0; x: 9;  y: 0  }   // A
-    VSegment { segIdx: 1; x: 46; y: 8  }   // B
-    VSegment { segIdx: 2; x: 46; y: 50 }   // C
-    HSegment { segIdx: 3; x: 9;  y: 86 }   // D
-    VSegment { segIdx: 4; x: 0;  y: 50 }   // E
-    VSegment { segIdx: 5; x: 0;  y: 8  }   // F
-    HSegment { segIdx: 6; x: 9;  y: 43 }   // G
-
+    RSeg { segIdx: 0; x: 9;  y: 0;  width: 38; height: 10 }   // A
+    RSeg { segIdx: 1; x: 46; y: 8;  width: 10; height: 38 }   // B
+    RSeg { segIdx: 2; x: 46; y: 50; width: 10; height: 38 }   // C
+    RSeg { segIdx: 3; x: 9;  y: 86; width: 38; height: 10 }   // D
+    RSeg { segIdx: 4; x: 0;  y: 50; width: 10; height: 38 }   // E
+    RSeg { segIdx: 5; x: 0;  y: 8;  width: 10; height: 38 }   // F
+    RSeg { segIdx: 6; x: 9;  y: 43; width: 38; height: 10 }   // G
 }

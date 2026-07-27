@@ -11,12 +11,16 @@ Item {
     property var revealedQ3: ({})
     property var revealedQ4: ({})
     property bool gameActive: false
-    // Chế độ "Play in Real-life": chơi cùng phần cứng thật, không cho phép Pause
     property bool realLifeMode: false
     property string oledMsg1: "Time is ticking..."
     property string oledMsg2: ""
 
-    // --- KẾT NỐI VỚI BACKEND ---
+    readonly property string monoFont: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+
+    // Nền tối
+    Rectangle { anchors.fill: parent; color: "#16130d" }
+
+    // --- KẾT NỐI VỚI BACKEND (GIỮ NGUYÊN) ---
     Connections {
         target: gameBoard
 
@@ -43,58 +47,49 @@ Item {
         }
 
         function onWrongGuessWarning() {
-                    verifyPopup.close() // Đóng hộp nhập liệu
-                    deniedPopup.open()  // Mở màn hình cảnh báo nhấp nháy đỏ
-                }
+            verifyPopup.close()
+            deniedPopup.open()
+        }
     }
 
     // --- 1. NÚT BACK ---
     Button {
         id: btnBack
-        // Đổi tên nút tùy theo trạng thái đang chơi hay đang review
         text: root.gameActive ? "❮ Pause & Menu" : "❮ Main Menu"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.margins: 15
-        width: 140; height: 35; z: 100
-        // Real-life mode: không cho Pause giữa ván (chỉ hiện lại khi ván đã kết thúc)
+        width: 150; height: 36; z: 100
         visible: !root.realLifeMode || !root.gameActive
 
-        background: Rectangle {
-            color: root.gameActive ? "#6b7280" : "#374151" // Khi review nút sẽ có màu tối hơn
-            radius: 5
-        }
-        contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+        background: Rectangle { color: "#2a2416"; radius: 9; border.width: 1; border.color: "#4a3f28" }
+        contentItem: Text { text: parent.text; color: "#f2ead9"; font.bold: true; font.family: root.monoFont; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
 
         onClicked: {
             if (root.gameActive) {
-                // Đang chơi dở -> Đóng băng và hiện nút Continue ở Menu
                 gameBoard.pauseGame();
                 stackView.push("ScreenMenu.qml", { "hasSavedGame": true });
             } else {
-                // Đang Review (Game Over) -> Về thẳng Menu và xóa sạch ngăn xếp
                 stackView.pop(null);
             }
         }
     }
 
-    // --- 2. BẢNG OLED ĐIỀU KHIỂN ---
+    // --- 2. BẢNG OLED ĐIỀU KHIỂN (Q1-Q4 lưới 2x2) ---
     Rectangle {
         id: controlPanel
-        // Kéo mảng OLED xuống dưới nút Back
         anchors.top: btnBack.bottom
-        anchors.topMargin: 20
-        // Kéo giãn full ngang màn hình (chừa lề 15px cho đẹp)
+        anchors.topMargin: 16
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.leftMargin: 15
         anchors.rightMargin: 15
-        height: 70
-        color: "#2d2d2d"; radius: 8
+        height: 84
+        color: "#0f0d08"; radius: 14; border.width: 1; border.color: "#5a4a28"
 
         Text {
             anchors.left: parent.left; anchors.leftMargin: 20; anchors.verticalCenter: parent.verticalCenter
-            color: "#10b981"; font.pixelSize: 14; font.bold: true; font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            color: "#7fce5e"; font.pixelSize: 15; font.bold: true; font.family: root.monoFont
             text: {
                 let m = Math.floor(gameBoard.playTimeSeconds / 60)
                 let s = gameBoard.playTimeSeconds % 60
@@ -103,39 +98,36 @@ Item {
         }
 
         Text {
-            // Giới hạn vùng text ở giữa: chừa khối TIME/PTS bên trái và cụm Q1-Q4
-            // bên phải, tránh chữ dài chui xuống dưới nút (bug từng thấy thực tế)
-            anchors.left: parent.left; anchors.leftMargin: 160
-            anchors.right: parent.right; anchors.rightMargin: 215
+            anchors.left: parent.left; anchors.leftMargin: 170
+            anchors.right: parent.right; anchors.rightMargin: 130
             anchors.verticalCenter: parent.verticalCenter
-            color: "#ffb700"; font.pixelSize: 15; font.bold: true
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            color: "#b7d84b"; font.pixelSize: 15; font.bold: true; font.family: root.monoFont
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
             text: root.oledMsg1 + (root.oledMsg2 !== "" ? "\n" + root.oledMsg2 : "")
         }
 
-        Row {
-            anchors.right: parent.right; anchors.rightMargin: 20; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+        Grid {
+            anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter
+            columns: 2; rowSpacing: 8; columnSpacing: 8
             Repeater {
                 model: ["Q1", "Q2", "Q3", "Q4"]
                 delegate: Rectangle {
-                    width: 38; height: 32; color: "#b066ff"; radius: 6
-                    Text { anchors.centerIn: parent; text: modelData; color: "white"; font.bold: true; font.pixelSize: 13 }
+                    required property string modelData
+                    width: 44; height: 30; color: "#ff6a1a"; radius: 8; border.width: 1; border.color: "#ff8a44"
+                    Text { anchors.centerIn: parent; text: modelData; color: "#1a0f04"; font.bold: true; font.pixelSize: 13; font.family: root.monoFont }
                     MouseArea { anchors.fill: parent; onClicked: gameBoard.handleButtonPress("SW", "BTN_" + modelData) }
                 }
             }
         }
     }
 
-    // --- 3. GỌI SA BÀN VÀ TRUYỀN DỮ LIỆU XUỐNG ---
+    // --- 3. SA BÀN ---
     BottomBoard {
         anchors.top: controlPanel.bottom
-        anchors.topMargin: 15
-
+        anchors.topMargin: 12
         anchors.bottom: btnVerify.top
-        anchors.bottomMargin: 10
-
+        anchors.bottomMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right
 
@@ -146,27 +138,24 @@ Item {
         gameActive: root.gameActive
     }
 
-    // --- 4. NÚT VERIFY (NẰM DƯỚI CÙNG) ---
+    // --- 4. NÚT VERIFY ---
     Button {
         id: btnVerify
         text: "VERIFY"
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 15
+        anchors.bottomMargin: 16
         anchors.horizontalCenter: parent.horizontalCenter
-        width: 180; height: 50; z: 10
+        width: 190; height: 52; z: 10
         visible: root.gameActive
 
-        background: Rectangle { color: "#ffb700"; radius: 6 }
+        background: Rectangle { color: "#ff6a1a"; radius: 12; border.width: 1; border.color: "#ff8a44" }
         contentItem: Text {
-            text: parent.text; color: "#111"; font.bold: true; font.pixelSize: 20
+            text: parent.text; color: "#1a0f04"; font.bold: true; font.pixelSize: 21
             horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+            font.family: root.monoFont
         }
 
-        onClicked: {
-            verifyPopup.open()
-            txtCodeInput.forceActiveFocus() // Tự động trỏ nháy chuột vào ô nhập
-        }
+        onClicked: { verifyPopup.open(); txtCodeInput.forceActiveFocus() }
     }
 
     // --- 5. POPUP NHẬP MÃ 6 SỐ ---
@@ -176,20 +165,17 @@ Item {
         anchors.centerIn: parent
         modal: true; focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
-        background: Rectangle { color: "#f9fafb"; radius: 10; border.color: "#d1d5db"; border.width: 2 }
+        background: Rectangle { color: "#1c1810"; radius: 14; border.color: "#5a4a28"; border.width: 2 }
 
         Column {
             anchors.centerIn: parent
             spacing: 20
-
             Text {
                 text: "ENTER 6 DIGITS CODE"
-                font.pixelSize: 18; font.bold: true; color: "#374151"
+                font.pixelSize: 18; font.bold: true; color: "#f2ead9"
                 anchors.horizontalCenter: parent.horizontalCenter
-                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+                font.family: root.monoFont
             }
-
             TextField {
                 id: txtCodeInput
                 width: 240; height: 50
@@ -198,28 +184,19 @@ Item {
                 horizontalAlignment: TextInput.AlignHCenter
                 inputMethodHints: Qt.ImhDigitsOnly
                 maximumLength: 6
-                color: "#111"
-
-                // Chỉ cho phép nhập đúng số từ 0-9
+                color: "#ffb000"
+                background: Rectangle { color: "#0c0a05"; radius: 8; border.color: "#5a4a28"; border.width: 2 }
                 validator: RegularExpressionValidator { regularExpression: /^[0-9]{0,6}$/ }
-
-                // Tự động xóa trắng mỗi khi bật popup lên
                 onVisibleChanged: { if (!visible) text = "" }
             }
-
             Button {
                 text: "ACCESS"
                 width: 150; height: 45
                 anchors.horizontalCenter: parent.horizontalCenter
-                // Nút chỉ sáng lên khi đã nhập đủ 6 số
                 enabled: txtCodeInput.text.length === 6
-
-                background: Rectangle { color: parent.enabled ? "#10b981" : "#9ca3af"; radius: 5 }
-                contentItem: Text { text: parent.text; color: "white"; font.bold: true; font.pixelSize: 18; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-
-                onClicked: {
-                    gameBoard.verifyCode(txtCodeInput.text)
-                }
+                background: Rectangle { color: parent.enabled ? "#b7d84b" : "#3a3524"; radius: 10 }
+                contentItem: Text { text: parent.text; color: parent.enabled ? "#12190a" : "#7a745a"; font.bold: true; font.pixelSize: 18; font.family: root.monoFont; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                onClicked: gameBoard.verifyCode(txtCodeInput.text)
             }
         }
     }
@@ -228,59 +205,41 @@ Item {
     Popup {
         id: deniedPopup
         anchors.centerIn: parent
-        width: root.width; height: root.height // Che phủ toàn bộ màn hình
+        width: root.width; height: root.height
         modal: true; focus: true
-        closePolicy: Popup.NoAutoClose // Khóa cứng, không cho bấm ra ngoài để tắt
-
-        background: Rectangle { color: Qt.rgba(0, 0, 0, 0.8) } // Làm nền tối mờ đi 80%
+        closePolicy: Popup.NoAutoClose
+        background: Rectangle { color: Qt.rgba(0, 0, 0, 0.8) }
 
         Rectangle {
             anchors.centerIn: parent
             width: 420; height: 130
-            color: "transparent"
-            border.color: "#ef4444"
-            border.width: 4
-            radius: 8
-
+            color: "transparent"; border.color: "#ef4444"; border.width: 4; radius: 10
             Text {
                 anchors.centerIn: parent
                 text: "ACCESS DENIED\nYOU HAVE ONE LAST CHANCE"
-                color: "#ef4444"
-                font.pixelSize: 22
-                font.bold: true
+                color: "#ef4444"; font.pixelSize: 22; font.bold: true
                 horizontalAlignment: Text.AlignHCenter
-                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-                lineHeight: 1.5
+                font.family: root.monoFont; lineHeight: 1.5
             }
-
-            // Hiệu ứng viền nhấp nháy Đỏ - Trong suốt (chu kỳ 0.3s)
             SequentialAnimation on border.color {
                 loops: Animation.Infinite
                 ColorAnimation { from: "#ef4444"; to: "transparent"; duration: 300 }
                 ColorAnimation { from: "transparent"; to: "#ef4444"; duration: 300 }
             }
         }
-
-        // Đồng hồ đếm 4s để tự động tắt Popup
-        Timer {
-            id: closeDeniedTimer
-            interval: 4000
-            onTriggered: deniedPopup.close()
-        }
-
+        Timer { id: closeDeniedTimer; interval: 4000; onTriggered: deniedPopup.close() }
         onOpened: closeDeniedTimer.start()
         onClosed: closeDeniedTimer.stop()
     }
 
-    // --- 7. CHÚ GIẢI 4 CÂU HỎI (góc dưới trái) ---
+    // --- 7. CHÚ GIẢI 4 CÂU HỎI ---
     Column {
         anchors.left: parent.left
-        anchors.leftMargin: 12
+        anchors.leftMargin: 15
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 12
+        anchors.bottomMargin: 14
         spacing: 2
         z: 5
-
         Repeater {
             model: [
                 "Q1 Even/Odd  - 1 LED",
@@ -289,35 +248,23 @@ Item {
                 "Q4 Full check- 2 rows/cols"
             ]
             delegate: Text {
-                text: modelData
-                font.pixelSize: 10
-                color: "#6b7280"
-                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+                required property string modelData
+                text: modelData; font.pixelSize: 10; color: "#9c8f72"; font.family: root.monoFont
             }
         }
-        Text {
-            text: "-5 pts each"
-            font.pixelSize: 10; font.italic: true
-            color: "#9ca3af"
-            font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
-        }
+        Text { text: "-5 pts each"; font.pixelSize: 10; font.italic: true; color: "#7a745a"; font.family: root.monoFont }
     }
 
-    // --- 8. NÚT SETTINGS (bánh răng, góc dưới phải) ---
+    // --- 8. NÚT SETTINGS ---
     Button {
         id: btnSettings
         anchors.right: parent.right
         anchors.rightMargin: 15
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 15
+        anchors.bottomMargin: 16
         width: 44; height: 44; z: 10
-
-        background: Rectangle { color: "#374151"; radius: 22 }
-        contentItem: Text {
-            text: "⚙" // ⚙
-            color: "white"; font.pixelSize: 24
-            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-        }
+        background: Rectangle { color: "#2a2416"; radius: 22; border.width: 1; border.color: "#4a3f28" }
+        contentItem: Text { text: "⚙"; color: "#f2ead9"; font.pixelSize: 24; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
         onClicked: settingsPopup.open()
     }
 
@@ -328,37 +275,31 @@ Item {
         anchors.centerIn: parent
         modal: true; focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        background: Rectangle { color: "#f9fafb"; radius: 10; border.color: "#d1d5db"; border.width: 2 }
+        background: Rectangle { color: "#1c1810"; radius: 14; border.color: "#5a4a28"; border.width: 2 }
 
         Column {
             id: settingsColumn
             anchors.centerIn: parent
             spacing: 12
-
             Text {
-                text: "SETTINGS"
-                font.pixelSize: 16; font.bold: true; color: "#374151"
-                anchors.horizontalCenter: parent.horizontalCenter
-                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+                text: "SETTINGS"; font.pixelSize: 16; font.bold: true; color: "#f2ead9"
+                anchors.horizontalCenter: parent.horizontalCenter; font.family: root.monoFont
             }
-
             Button {
                 text: "Rules"
                 width: 200; height: 42
                 anchors.horizontalCenter: parent.horizontalCenter
-                background: Rectangle { color: "#ffffff"; border.color: "#ccc"; radius: 5 }
-                contentItem: Text { text: parent.text; color: "black"; font.pixelSize: 15; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                background: Rectangle { color: "#241f14"; border.color: "#4a3f28"; border.width: 1; radius: 8 }
+                contentItem: Text { text: parent.text; color: "#f2ead9"; font.pixelSize: 15; font.family: root.monoFont; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                 onClicked: { settingsPopup.close(); rulesPopup.open() }
             }
-
             Button {
-                // Real-life mode đang chơi: không có Exit (Exit = pause trá hình)
                 visible: !root.realLifeMode || !root.gameActive
                 text: root.gameActive ? "Pause & Exit to Menu" : "Exit to Menu"
                 width: 200; height: 42
                 anchors.horizontalCenter: parent.horizontalCenter
-                background: Rectangle { color: "#6b7280"; radius: 5 }
-                contentItem: Text { text: parent.text; color: "white"; font.bold: true; font.pixelSize: 14; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                background: Rectangle { color: "#2a2416"; radius: 8; border.width: 1; border.color: "#4a3f28" }
+                contentItem: Text { text: parent.text; color: "#f2ead9"; font.bold: true; font.pixelSize: 14; font.family: root.monoFont; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                 onClicked: {
                     settingsPopup.close()
                     if (root.gameActive) {
@@ -369,13 +310,12 @@ Item {
                     }
                 }
             }
-
             Button {
                 text: "Close"
                 width: 200; height: 36
                 anchors.horizontalCenter: parent.horizontalCenter
-                background: Rectangle { color: "transparent"; border.color: "#d1d5db"; radius: 5 }
-                contentItem: Text { text: parent.text; color: "#6b7280"; font.pixelSize: 13; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                background: Rectangle { color: "transparent"; border.color: "#4a3f28"; border.width: 1; radius: 8 }
+                contentItem: Text { text: parent.text; color: "#9c8f72"; font.pixelSize: 13; font.family: root.monoFont; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                 onClicked: settingsPopup.close()
             }
         }
@@ -388,21 +328,20 @@ Item {
         anchors.centerIn: parent
         modal: true; focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        background: Rectangle { color: "#1f2937"; radius: 10; border.color: "#4b5563"; border.width: 2 }
+        background: Rectangle { color: "#14110b"; radius: 14; border.color: "#5a4a28"; border.width: 2 }
 
         Flickable {
             anchors.fill: parent
             anchors.margins: 18
             contentHeight: rulesText.implicitHeight
             clip: true
-
             Text {
                 id: rulesText
                 width: parent.width
                 wrapMode: Text.WordWrap
-                color: "#e5e7eb"
+                color: "#e6d9b8"
                 font.pixelSize: 12
-                font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+                font.family: root.monoFont
                 lineHeight: 1.35
                 text:
                     "== GOAL ==\n" +
@@ -439,7 +378,7 @@ Item {
             anchors.right: parent.right
             width: 30; height: 30
             background: Rectangle { color: "transparent" }
-            contentItem: Text { text: parent.text; color: "#9ca3af"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            contentItem: Text { text: parent.text; color: "#9c8f72"; font.pixelSize: 16; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             onClicked: rulesPopup.close()
         }
     }

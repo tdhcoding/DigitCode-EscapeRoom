@@ -2,21 +2,24 @@ import QtQuick
 
 Rectangle {
     id: root
-    width: 20; height: 20
-    radius: 2
+    width: 22; height: 22
+    radius: 6
 
     property string label: "A"
     property string overrideColor: "" // Nhận màu Xanh/Đỏ từ hệ thống (Câu 4)
 
     signal tapped()
 
-    // Màu nền: Ưu tiên màu override, nếu không thì xám, khi bấm giữ thì chuyển tím
-    color: overrideColor !== "" ? overrideColor : (mouseArea.pressed ? "#b066ff" : "#e0e0e0")
+    // Q4: xanh (FULL) / đỏ (NOT FULL). Mặc định: tối, bấm giữ -> hổ phách.
+    color: overrideColor !== "" ? overrideColor : (mouseArea.pressed ? "#ff6a1a" : "#241f14")
+    border.width: 2
+    border.color: overrideColor !== "" ? overrideColor : "#4a3f28"
+    antialiasing: true
 
     Text {
         anchors.centerIn: parent
         text: root.label
-        color: (overrideColor !== "" || mouseArea.pressed) ? "#ffffff" : "#333333"
+        color: (overrideColor !== "" || mouseArea.pressed) ? "#1a0f04" : "#e6d9b8"
         font.pixelSize: 12; font.bold: true
         font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
     }

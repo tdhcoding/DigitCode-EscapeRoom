@@ -4,106 +4,102 @@ import QtQuick.Controls
 Item {
     id: root
 
-    // Biến cờ hiệu: true nếu màn hình này được bật lên từ nút "Back to Menu"
+    // Cờ hiệu: true nếu màn này bật lên từ "Back to Menu"
     property bool hasSavedGame: false
+    readonly property string monoFont: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
 
-    Rectangle {
-        anchors.fill: parent
-        color: "#f3f4f6"
-    }
+    Rectangle { anchors.fill: parent; color: "#16130d" }
 
-    Text {
-        anchors.top: parent.top
-        anchors.topMargin: 80
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: "DIGIT_CODE"
-        font.pixelSize: 45
-        font.bold: true
-        font.family: Qt.platform.os === "osx" ? "Menlo" : "Courier New"
+    // Nút menu tông tối, tái sử dụng
+    component MenuBtn: Button {
+        id: ctrl
+        property color bg: "#241f14"
+        property color fg: "#f2ead9"
+        property color bord: "#4a3f28"
+        property bool primary: false
+        width: 250; height: 56
+        background: Rectangle { color: ctrl.enabled ? ctrl.bg : "#1a160e"; radius: 12; border.width: ctrl.primary ? 0 : 2; border.color: ctrl.bord }
+        contentItem: Text {
+            text: ctrl.text; color: ctrl.enabled ? ctrl.fg : "#6b6350"
+            font.pixelSize: 17; font.bold: ctrl.primary; font.family: root.monoFont
+            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+        }
     }
 
     Column {
         anchors.centerIn: parent
-        spacing: 20
+        spacing: 18
 
-        // 1. NÚT CONTINUE (Chỉ hiện khi có game đang tạm dừng)
-        Button {
+        // --- Thương hiệu ---
+        Column {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 10
+            bottomPadding: 14
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "CYBER-PHYSICAL ESCAPE ROOM"
+                color: "#9c8f72"; font.pixelSize: 12; font.letterSpacing: 4; font.family: root.monoFont
+            }
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                Text { text: "DIGIT"; color: "#f2ead9"; font.pixelSize: 46; font.bold: true; font.family: root.monoFont }
+                Text { text: "_";     color: "#ff6a1a"; font.pixelSize: 46; font.bold: true; font.family: root.monoFont }
+                Text { text: "CODE";  color: "#f2ead9"; font.pixelSize: 46; font.bold: true; font.family: root.monoFont }
+            }
+        }
+
+        // 1. CONTINUE (chỉ khi có game tạm dừng)
+        MenuBtn {
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: root.hasSavedGame
             text: "Continue"
-            width: 220; height: 55
-            font.pixelSize: 18
-            visible: root.hasSavedGame // Ẩn/hiện dựa vào cờ hiệu
-
-            background: Rectangle { color: "#10b981"; radius: 5 } // Màu xanh lá nổi bật
-            contentItem: Text { text: parent.text; color: "white"; font.bold: true; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
-
-            onClicked: {
-                gameBoard.resumeGame(); // Đánh thức Timer chạy lại
-                stackView.pop(); // Rút Menu này ra khỏi ngăn xếp -> Lộ ra ScreenGame nguyên vẹn ở bên dưới!
-            }
+            primary: true; bg: "#b7d84b"; fg: "#12190a"
+            onClicked: { gameBoard.resumeGame(); stackView.pop() }
         }
 
-        // 2. NÚT CHƠI MỚI
-        Button {
+        // 2. CHƠI MỚI
+        MenuBtn {
+            anchors.horizontalCenter: parent.horizontalCenter
             text: root.hasSavedGame ? "New Single Challenge" : "Single Challenge"
-            width: 220; height: 55
-            font.pixelSize: 18
-
-            background: Rectangle { color: root.hasSavedGame ? "#ef4444" : "#ffffff"; border.color: "#ccc"; radius: 5 }
-            contentItem: Text {
-                text: parent.text; color: root.hasSavedGame ? "white" : "black";
-                font.bold: false; font.pixelSize: 18;
-                horizontalAlignment: Text.AlignHCenter;
-                verticalAlignment: Text.AlignVCenter
-            }
-
+            primary: true
+            bg: root.hasSavedGame ? "#e5484d" : "#ff6a1a"
+            fg: root.hasSavedGame ? "#ffffff" : "#1a0f04"
             onClicked: {
-                if (root.hasSavedGame) {
-                    // Nếu đang có game cũ mà vẫn bấm chơi mới -> Phá hủy toàn bộ ngăn xếp về tận gốc
-                    stackView.pop(null);
-                    stackView.push("ScreenReady.qml"); // Sau đó mở màn hình Ready
-                } else {
-                    stackView.push("ScreenReady.qml");
-                }
+                if (root.hasSavedGame) { stackView.pop(null); stackView.push("ScreenReady.qml") }
+                else { stackView.push("ScreenReady.qml") }
             }
         }
 
-        // 3. NÚT CHƠI VỚI PHẦN CỨNG THẬT (mirror mode, không cho Pause)
-        Button {
+        // 3. CHƠI VỚI PHẦN CỨNG THẬT
+        MenuBtn {
+            anchors.horizontalCenter: parent.horizontalCenter
             text: "Play in Real-life"
-            width: 220; height: 55
-            font.pixelSize: 18
-
-            background: Rectangle {
-                color: hwServer.connected ? "#10b981" : "#ffffff"
-                border.color: "#ccc"; radius: 5
-            }
-            contentItem: Text {
-                text: parent.text
-                color: hwServer.connected ? "white" : "black"
-                font.pixelSize: 18
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-
+            primary: hwServer.connected
+            bg: hwServer.connected ? "#b7d84b" : "#241f14"
+            fg: hwServer.connected ? "#12190a" : "#f2ead9"
             onClicked: {
-                if (root.hasSavedGame) {
-                    stackView.pop(null); // Hủy ván đang tạm dừng (giống New Single Challenge)
-                }
+                if (root.hasSavedGame) { stackView.pop(null) }
                 stackView.push("ScreenRealLife.qml")
             }
         }
 
-        Button {
+        // 4. 1v1 (khoá)
+        MenuBtn {
+            anchors.horizontalCenter: parent.horizontalCenter
             text: "1v1 Challenge"
-            width: 220; height: 55
-            font.pixelSize: 18
             enabled: false
         }
 
-        Button {
+        // 5. RULES
+        MenuBtn {
+            anchors.horizontalCenter: parent.horizontalCenter
             text: "Rules"
-            width: 220; height: 55
-            font.pixelSize: 18
         }
+    }
+
+    Text {
+        anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottomMargin: 18
+        text: "v6 · SINGLE"; color: "#6b6350"; font.pixelSize: 12; font.family: root.monoFont
     }
 }
