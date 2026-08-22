@@ -37,7 +37,7 @@ A Match whose final result changes both Players' Elo ratings.
 _Avoid_: Competitive game, rated room
 
 **Practice Match**:
-A Match that follows the same game rules without changing either Player's Elo rating.
+A Match that follows the same game rules as a Ranked Match, except that it draws its Puzzle from the unrestricted pool, and that it does not change either Player's Elo rating.
 _Avoid_: Casual game, friendly room
 
 **Production MVP**:

@@ -11,6 +11,7 @@ sách ở mục 5. Nguồn của mọi hằng số cấu trúc là backend/gameb
 375-388, 512-556 trên branch feat/puzzle-fairness-characterization.
 """
 
+from fractions import Fraction
 from itertools import product
 
 # --- Hằng số port từ backend/gameboard.cpp -----------------------------------
@@ -76,12 +77,37 @@ check("A..I không trùng ô (R-C-08)", len(set(col_cells)), 42)
 check("Ô do J..S phủ (R-C-08)", len(row_cells), 42)
 check("J..S không trùng ô (R-C-08)", len(set(row_cells)), 42)
 
-# 3. Miền đáp án của 19 bộ đếm — R-C-07
-DOMAIN = {**{c: 4 for c in "ACDFGI"}, **{c: 6 for c in "BEH"},
-          **{c: 3 for c in "JLNOQS"}, **{c: 6 for c in "KMPR"}}
-bad_domain = [cid for cid, (leds, segs) in COUNTERS.items()
-              if len(leds) * len(segs) != DOMAIN[cid]]
-check("Miền đáp án 19 bộ đếm khớp R-C-07", bad_domain, [])
+# 3. Trần danh nghĩa của 19 bộ đếm — R-C-07 cột 4
+NOMINAL = {**{c: 4 for c in "ACDFGI"}, **{c: 6 for c in "BEH"},
+           **{c: 3 for c in "JLNOQS"}, **{c: 6 for c in "KMPR"}}
+check("Trần danh nghĩa 19 bộ đếm khớp R-C-07",
+      [cid for cid, (leds, segs) in COUNTERS.items()
+       if len(leds) * len(segs) != NOMINAL[cid]], [])
+
+# 3b. Hạng ma trận 19 bộ đếm — R-C-16: HAI quan hệ, không phải một
+rows = []
+for cid in "ABCDEFGHIJKLMNOPQRS":
+    leds, segs = COUNTERS[cid]
+    v = [Fraction(0)] * 42
+    for l in leds:
+        for sg in segs:
+            v[l * 7 + sg] = Fraction(1)
+    rows.append(v)
+rank = 0
+for col in range(42):
+    piv = next((r for r in range(rank, len(rows)) if rows[r][col] != 0), None)
+    if piv is None:
+        continue
+    rows[rank], rows[piv] = rows[piv], rows[rank]
+    pv = rows[rank][col]
+    rows[rank] = [x / pv for x in rows[rank]]
+    for r in range(len(rows)):
+        if r != rank and rows[r][col] != 0:
+            f = rows[r][col]
+            rows[r] = [a - f * b for a, b in zip(rows[r], rows[rank])]
+    rank += 1
+check("Hạng ma trận 19 bộ đếm (R-C-16)", rank, 17)
+check("Số bộ đếm luôn suy được (R-C-16)", 19 - rank, 2)
 
 
 def signature(code):
@@ -97,6 +123,22 @@ def signature(code):
 # 4. Q2 không bao giờ trả EQUAL — R-C-06
 check("Mã hợp lệ làm Q2 trả EQUAL (R-C-06)",
       sum(1 for c in valid_codes if any(c[i] == c[j] for i, j in ADJACENT)), 0)
+
+# 3c. Miền ĐẠT ĐƯỢC của 19 bộ đếm — R-C-07 cột 5, và tính liên tục
+ACHIEVABLE = {**{c: (0, 4) for c in "ADG"}, **{c: (1, 6) for c in "BEH"},
+              **{c: (2, 4) for c in "CFI"}, **{c: (0, 3) for c in "JLNOQS"},
+              **{c: (3, 6) for c in "KMPR"}}
+seen = {cid: set() for cid in COUNTERS}
+for c in valid_codes:
+    st = [DIGIT_MAP[ch] for ch in c]
+    for cid, (leds, segs) in COUNTERS.items():
+        seen[cid].add(sum(st[l][sg] for l in leds for sg in segs))
+check("Miền đạt được của 19 bộ đếm khớp R-C-07",
+      {cid: (min(v), max(v)) for cid, v in seen.items()}, ACHIEVABLE)
+check("Mọi miền đạt được đều liên tục (R-C-07)",
+      [cid for cid, v in seen.items() if sorted(v) != list(range(min(v), max(v) + 1))], [])
+check("Số bộ đếm hẹp hơn trần danh nghĩa (R-C-07)",
+      sum(1 for cid in COUNTERS if ACHIEVABLE[cid] != (0, NOMINAL[cid])), 10)
 
 print("Tính signature cho 465.120 mã...", flush=True)
 groups = {}
