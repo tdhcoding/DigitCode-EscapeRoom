@@ -1,0 +1,474 @@
+# DigitCode — Canonical Competitive Game Specification
+
+`ruleset_id`: **`digitcode-ruleset/1.0.0`**
+
+Ticket: [Chốt competitive game specification chuẩn](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/9)
+Map: [Wayfinder: DigitCode web multiplayer production MVP](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/1)
+Branch: `feat/competitive-game-spec`
+
+Đây là **luật chơi chuẩn duy nhất** cho bản web 1v1. Nó kế thừa standing
+decisions ở Notes của map #1, dựa trên số liệu của
+[Định lượng độ công bằng và khả năng giải của Puzzle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/6),
+và **cố ý không port** các hành vi native mà #6 xếp là bug hoặc lifecycle
+coupling (đối chiếu đầy đủ ở mục 11).
+
+Luật được đánh số để execution ticket và test trích dẫn trực tiếp. **MUST** là
+bắt buộc; **MUST NOT** là cấm.
+
+Fact-only reference cho cơ chế native, kèm `file:line`, nằm ở
+[`clue-reference.md`](clue-reference.md). Nó **không** phải luật; nơi spec này
+khác native, spec này thắng.
+
+---
+
+## 1. Từ vựng
+
+Dùng đúng từ vựng ở [`CONTEXT.md`](../../../CONTEXT.md) tại repo root. Các
+thuật ngữ spec này bổ sung: Clue, Player Board, Verify, Strike, Forfeit, Draw,
+Match Clock, Solve Time, Ruleset.
+
+Một quy ước đọc: **Puzzle** là bí mật cộng các fact suy ra từ nó; **Player
+Board** là thứ người chơi vẽ. Hai thứ này không bao giờ là một — native làm
+chúng trông như một vì clue tự vẽ lên bàn cờ, và spec này bỏ hẳn điều đó
+(R-C-09).
+
+---
+
+## 2. Puzzle
+
+### 2.1 Hình học và định danh
+
+- **R-P-01** Bàn là lưới **2 hàng × 3 cột**, sáu LED, định danh `T U V` (hàng
+  trên, index 0–2) và `W X Y` (hàng dưới, index 3–5).
+- **R-P-02** Mỗi LED có **7 segment** `a b c d e f g` theo quy ước bảy đoạn.
+  Bàn có đúng `6 × 7 = 42` ô LED×segment.
+- **R-P-03** Một Puzzle là một **mã bí mật sáu chữ số**, chữ số thứ `i` thuộc
+  LED index `i`.
+
+### 2.2 Ràng buộc sinh mã
+
+- **R-P-04** Mã hợp lệ MUST thoả cả ba ràng buộc:
+  1. mỗi chữ số xuất hiện **tối đa 2 lần** trong mã;
+  2. hai LED **kề nhau theo hàng** MUST khác chữ số — bốn cặp `T-U`, `U-V`,
+     `W-X`, `X-Y`;
+  3. hai LED **kề nhau theo cột** MUST khác chữ số — ba cặp `T-W`, `U-X`,
+     `V-Y`.
+- **R-P-05** Tập mã hợp lệ có đúng **465.120** phần tử (EXACT, #6 xác nhận
+  bằng ba đường độc lập).
+- **R-P-06** Ba ràng buộc trên MUST NOT bị nới. Bỏ ràng buộc kề nhau sẽ khiến
+  Q2 có ba đáp án thay vì hai và làm vô hiệu toàn bộ tính toán chi phí clue
+  của #6.
+
+### 2.3 Lấy mẫu
+
+- **R-P-07** Puzzle MUST được rút **uniform** trên pool eligible: mọi mã trong
+  pool có xác suất bằng nhau, chính xác.
+- **R-P-08** Rejection sampler theo từng vị trí của native MUST NOT được dùng.
+  Nó lệch `p_max/p_min = 9/7` **exact**. #6 chứng minh bias này không chuyển
+  thành bias độ khó (trung bình 11,83 lần mua theo phân phối thật vs 11,84
+  uniform), nên đây là quyết định về công bằng thống kê: không mất gì khi sửa,
+  và giữ lại thì mở ra một khiếu nại không phản bác được ở Ranked.
+
+### 2.4 Eligibility
+
+- **R-P-09** **Practice Match**: pool là toàn bộ **465.120** mã.
+- **R-P-10** **Ranked Match**: pool là **464.948** mã — loại 172 mã thuộc 86
+  cặp collision.
+- **R-P-11** Cặp collision là hai mã không phân biệt được **kể cả khi biết
+  toàn bộ clue**. Cả 86 cặp là một họ duy nhất: **đổi chỗ cột trái và cột
+  phải** (vị trí 0↔2 và 3↔5), với cặp chữ số `(4,6)` ở một hàng và `(5,7)` ở
+  hàng kia. Ví dụ `406517` ↔ `604715`.
+- **R-P-12** Vị từ eligibility MUST kiểm chứng được bằng test, không phụ thuộc
+  bất kỳ tham số runtime nào.
+
+Lý do R-P-10: với một cặp collision, người chơi suy luận hoàn hảo vẫn còn hai
+ứng viên và buộc phải tung đồng xu — đúng vào lúc Score hai bên chênh nhau ít
+nhất. Loại 0,037% pool rẻ hơn nhiều so với thêm clue phá đối xứng (phải tính
+lại toàn bộ chi phí clue) hoặc đổi luật đoán sai (không xoá được 50/50, chỉ
+đổi giá của nó).
+
+### 2.5 Định danh và phân phát
+
+- **R-P-13** Một Match có **đúng một** Puzzle, sinh lúc tạo Match, dùng chung
+  cho cả hai Player.
+- **R-P-14** Puzzle MUST được lưu server-side trong Match record. Client nhận
+  một `puzzle_id` **mờ**, và chỉ sau khi Match kết thúc.
+- **R-P-15** Mọi đáp án Clue MUST được tính trên server theo từng yêu cầu.
+
+---
+
+## 3. Player Board
+
+- **R-B-01** Player Board có 42 ô LED×segment. Mỗi ô có đúng **hai** trạng
+  thái: **tắt (0)** hoặc **bật (1)**.
+- **R-B-02** Trạng thái thứ ba MUST NOT tồn tại ở phía server. Native có
+  `hold = 2` và chính nó đẻ ra hai đường thắng chấm cùng một bàn cờ ra hai kết
+  quả khác nhau.
+- **R-B-03** Ghi chú nháp của người chơi (đánh dấu ứng viên) MAY tồn tại thuần
+  client. Nó MUST NOT được gửi lên server và MUST NOT thuộc Player State.
+- **R-B-04** Player Board **giải mã được** khi cả sáu LED đều khớp chính xác
+  mẫu bảy đoạn của một chữ số `0..9`. Kết quả giải mã là một mã sáu chữ số.
+- **R-B-05** Client MUST hiển thị Player Board hiện **giải mã được hay không**,
+  liên tục, trước khi Verify. Tín hiệu này là hàm của riêng Player Board nên
+  không rò rỉ bit nào về Puzzle.
+- **R-B-06** Chỉ Player mới ghi được vào Player Board của mình. Không cơ chế
+  nào khác được phép ghi vào nó.
+
+---
+
+## 4. Clue
+
+### 4.1 Catalogue
+
+- **R-C-01** Có đúng **32 Clue** mua được, chia ba họ:
+
+| Họ | Số Clue | Mục tiêu | Đáp án |
+| --- | --- | --- | --- |
+| **Q1 — chẵn/lẻ** | 6 | một LED `T..Y` | `EVEN` hoặc `ODD` |
+| **Q2 — so sánh** | 7 | một cặp LED kề nhau | `GREATER` hoặc `LESS` |
+| **Q3 — bộ đếm** | 19 | một dải `A..S` | số nguyên |
+
+- **R-C-02** Họ **Q4 (kiểm tra FULL) bị loại bỏ**. #6 chứng minh Q4 suy hoàn
+  toàn từ Q3 (0 vi phạm trên toàn bộ 465.120 mã) và đứng một mình thì thô hơn
+  Q3 **24,6 lần**. Giá trị thật duy nhất của nó là tác dụng phụ tự vẽ, mà
+  R-C-09 cấm.
+
+### 4.2 Q1 — chẵn/lẻ
+
+- **R-C-03** Mục tiêu là một LED trong `T U V W X Y`. Đáp án là chữ số ở LED
+  đó chẵn hay lẻ. `0` là chẵn.
+
+### 4.3 Q2 — so sánh
+
+- **R-C-04** Mục tiêu là một trong đúng **bảy cặp LED kề nhau**: `T-U`, `U-V`,
+  `W-X`, `X-Y` (ngang) và `T-W`, `U-X`, `V-Y` (dọc). Cặp không kề nhau MUST bị
+  từ chối là id không hợp lệ (R-I-04).
+- **R-C-05** Đáp án là so sánh hai chữ số theo thứ tự cặp đã nêu: `GREATER`
+  hoặc `LESS`.
+- **R-C-06** Đáp án `EQUAL` MUST NOT tồn tại. R-P-04 cấm hai LED kề nhau bằng
+  nhau, nên nhánh này là luật chết dưới ràng buộc sinh mã hiện hành. Native
+  vẫn mang nhánh `'='` và một fallback `return 0`; sao chép chúng sẽ giấu một
+  quyết định thiết kế chưa từng được đưa ra.
+
+### 4.4 Q3 — bộ đếm
+
+- **R-C-07** Mục tiêu là một trong 19 dải `A..S`. Đáp án là **số ô LED×segment
+  đang sáng trong mã bí mật** thuộc dải đó. Đếm trên Puzzle, **không** đếm
+  trên Player Board.
+
+Chín dải **cột** (mỗi dải phủ hai LED cùng cột):
+
+| ID | LED | Segment | Miền đáp án |
+| --- | --- | --- | --- |
+| `A` | `T`,`W` | `f`,`e` | 0–4 |
+| `B` | `T`,`W` | `a`,`g`,`d` | 0–6 |
+| `C` | `T`,`W` | `b`,`c` | 0–4 |
+| `D` | `U`,`X` | `f`,`e` | 0–4 |
+| `E` | `U`,`X` | `a`,`g`,`d` | 0–6 |
+| `F` | `U`,`X` | `b`,`c` | 0–4 |
+| `G` | `V`,`Y` | `f`,`e` | 0–4 |
+| `H` | `V`,`Y` | `a`,`g`,`d` | 0–6 |
+| `I` | `V`,`Y` | `b`,`c` | 0–4 |
+
+Mười dải **hàng** (mỗi dải phủ ba LED cùng hàng):
+
+| ID | LED | Segment | Miền đáp án |
+| --- | --- | --- | --- |
+| `J` | `T`,`U`,`V` | `a` | 0–3 |
+| `K` | `T`,`U`,`V` | `f`,`b` | 0–6 |
+| `L` | `T`,`U`,`V` | `g` | 0–3 |
+| `M` | `T`,`U`,`V` | `e`,`c` | 0–6 |
+| `N` | `T`,`U`,`V` | `d` | 0–3 |
+| `O` | `W`,`X`,`Y` | `a` | 0–3 |
+| `P` | `W`,`X`,`Y` | `f`,`b` | 0–6 |
+| `Q` | `W`,`X`,`Y` | `g` | 0–3 |
+| `R` | `W`,`X`,`Y` | `e`,`c` | 0–6 |
+| `S` | `W`,`X`,`Y` | `d` | 0–3 |
+
+- **R-C-08** Hai tập này là **hai phân hoạch độc lập của cùng 42 ô**: `A..I`
+  phủ đúng 42 ô mỗi ô một lần, `J..S` cũng vậy. Hệ quả: `ΣA..I = ΣJ..S`, và
+  bộ đếm thứ 19 luôn suy được từ 18 bộ còn lại. Đây là tính chất **cố ý giữ
+  lại** — xem R-C-13.
+
+### 4.5 Mua Clue
+
+- **R-C-09** Clue MUST chỉ trả **thông tin**. Nó MUST NOT ghi vào Player
+  Board, MUST NOT bật hay khoá segment nào. Native tự vẽ và khoá nhóm khi kết
+  quả là FULL, khiến hai Clue cùng giá 5 điểm có giá trị khác hẳn nhau tuỳ đáp
+  án trả về.
+- **R-C-10** Mua Clue là **một request nguyên tử** mang cả loại lẫn mục tiêu.
+  MUST NOT tồn tại trạng thái "đang chờ chọn mục tiêu".
+- **R-C-11** Không có **pending-question timeout**. Khung 10 giây và khoản
+  phạt −1 điểm của native bị xoá hẳn: chúng là hệ quả của bàn phím sáu nút,
+  không phải luật chơi.
+- **R-C-12** Giá là **5 Score cho một Clue, một mục tiêu**, phẳng cho cả ba họ.
+- **R-C-13** Mua lại **đúng một Clue đã sở hữu** MUST bị từ chối **tường minh
+  và miễn phí**: không trừ Score, không tính là lần mua, không đổi state. Quy
+  tắc này áp dụng như nhau cho cả ba họ.
+- **R-C-14** Clue **suy ra được bằng logic** từ các Clue đã sở hữu (ví dụ bộ
+  đếm thứ 19 theo R-C-08) MUST NOT bị chặn. Chỉ chặn trùng **cú pháp**. Nhận
+  ra một Clue là dư thừa chính là kỹ năng của trò chơi; còn chặn suy diễn thì
+  phải giải hệ ngay trong đường mua Clue và sẽ phá vỡ ngân sách mà #6 đã tính.
+- **R-C-15** Mọi Clue đã mua và đáp án của nó MUST hiển thị lại **miễn phí và
+  không giới hạn** cho chính Player đó suốt Match.
+
+---
+
+## 5. Score và đồng hồ
+
+- **R-S-01** Mỗi Player khởi đầu **100 Score**.
+- **R-S-02** Mỗi Match có **một Match Clock duy nhất**, wall-clock, chạy từ
+  lúc Match bắt đầu. Mọi thời hạn đọc từ đồng hồ này.
+- **R-S-03** **Không có Pause.** Native cho pause dừng đồng hồ, huỷ vĩnh viễn
+  khung phạt và có thể khiến người chơi bất tử — #6 xếp là exploit hoàn chỉnh.
+- **R-S-04** Mất kết nối MUST NOT dừng Match Clock.
+- **R-S-05** Mỗi Player mất **1 Score mỗi 60 giây** Match Clock.
+- **R-S-06** Deadline của Match là **15 phút** Match Clock, áp cho cả hai
+  Player.
+- **R-S-07** Score MUST NOT xuống dưới **0**. Hao mòn thời gian và phạt Wrong
+  Guess đều dừng ở 0.
+- **R-S-08** Mua Clue khi Score < 5 MUST bị từ chối tường minh. Không mua
+  chịu, không Score âm.
+- **R-S-09** Score bằng 0 **không** phải terminal. Player vẫn chơi tiếp, vẫn
+  Verify được.
+
+Ngân sách suy ra từ R-S-01/05/06/12:
+
+```text
+100 Score, 5/Clue, −1 mỗi 60 giây, deadline 15:00
+
+  hao mòn tối đa tới deadline : 15 Score
+  còn lại cho Clue            : 85 Score -> 17 lần mua (kết thúc ở đúng 0)
+
+  #6, adaptive greedy worst case : 16 lần mua   <- trần phủ được, dư 1
+  #6, adaptive greedy p99        : 15 lần mua
+  #6, adaptive greedy trung vị   : 12 lần mua
+  #6, adaptive lower bound       :  8 lần mua
+```
+
+- **R-S-12** Trần này là **17**, không phải 16 như bảng ngân sách của #6. #6
+  tính dưới luật native "Score ≤ 0 là thua", nên phải chừa lại ít nhất 1 Score;
+  R-S-09 bỏ luật đó, nên lần mua thứ 17 hợp lệ và kết thúc ở đúng 0. Cùng lý
+  do, con số cho hao mòn 30 giây là **14**, không phải 13.
+
+- **R-S-10** Ngân sách này cố ý giữ tính chất: **không thể mua hết Clue**.
+  32 Clue × 5 = 160 Score > 100.
+- **R-S-11** Hao mòn 60 giây được chọn thay vì 30 giây của Notes map #1. Ở 30
+  giây, trần là 14 lần mua — **thấp hơn** worst case 16 của chiến lược adaptive
+  tốt nhất đã biết, nên ở những Puzzle khó nhất, người chơi giỏi nhất vẫn buộc
+  phải đoán. Ở 60 giây, trần 17 phủ được worst case với đúng một lần mua dư.
+  Biên độ đó mỏng có chủ ý, và 16 mới chỉ là chặn trên heuristic — #6 chưa đóng
+  khoảng `[8, 16]`, nên cây tối ưu có thể cần ít hơn, không bao giờ cần nhiều
+  hơn.
+
+---
+
+## 6. Verify và Wrong Guess
+
+- **R-V-01** Đường Solve **duy nhất** là hành động **Verify tường minh** do
+  Player phát ra.
+- **R-V-02** Player Board khớp mã bí mật MUST NOT tự kích hoạt thắng. Native
+  cho thắng ngay khi bàn cờ khớp, khiến đoán bằng cách vẽ trở nên **miễn phí
+  và vô hạn lượt** và biến toàn bộ chính sách Wrong Guess thành trang trí:
+  người chơi chỉ cần thu hẹp về ≤ 8 ứng viên (trung bình 9,43 lần mua) rồi vẽ
+  thử cả 8, tiết kiệm khoảng 12 Score mỗi ván.
+- **R-V-03** Server MUST NOT phát bất kỳ tín hiệu nào cho biết Player Board
+  hiện đang đúng.
+- **R-V-04** Verify **luôn miễn phí** và luôn được phép khi Player còn
+  `ACTIVE`, kể cả khi Score = 0.
+- **R-V-05** Verify trên Player Board **không giải mã được** (R-B-04) MUST bị
+  từ chối **tường minh**: không phải Wrong Guess, không tính Strike, không mất
+  Score, không đổi state. Đúng định nghĩa Wrong Guess trong `CONTEXT.md`.
+- **R-V-06** Verify trên Player Board giải mã được, mã khớp Puzzle → **Solve**.
+  Ghi lại Score tại thời điểm đó và **Solve Time** = mili giây từ Match start.
+  Player chuyển sang `SOLVED`.
+- **R-V-07** Verify trên Player Board giải mã được, mã không khớp → **Wrong
+  Guess**, tăng Strike.
+- **R-V-08** **Strike thứ nhất**: −10 Score (sàn 0 theo R-S-07) và **khoá
+  Verify 10 giây** Match Clock. Khoá chỉ khoá Verify; Player vẫn mua Clue và
+  vẽ được. Đồng hồ vẫn chạy, nên khoá đã là hình phạt thật.
+- **R-V-09** **Strike thứ hai**: Player chuyển sang `ELIMINATED` ngay.
+- **R-V-10** `ELIMINATED` MUST NOT đưa Score về 0. Score là bản ghi lịch sử;
+  thứ hạng đã do R-T-04 quyết định.
+- **R-V-11** Hình phạt Wrong Guess là **state của server**. Mọi client MUST
+  thấy giống hệt nhau. Native để hình phạt lần một nằm trong popup QML nên
+  người chơi phần cứng không nhận gì cả.
+
+---
+
+## 7. Terminal state và Match outcome
+
+- **R-T-01** Mỗi Player trong Match có đúng một trạng thái:
+
+| State | Vào bằng |
+| --- | --- |
+| `ACTIVE` | Match bắt đầu |
+| `SOLVED` | Verify đúng (R-V-06) |
+| `ELIMINATED` | Strike thứ hai (R-V-09) |
+| `EXPIRED` | Match Clock chạm 15:00 khi còn `ACTIVE` |
+| `FORFEITED` | Player chủ động bỏ cuộc (R-T-06) |
+
+- **R-T-02** Bốn state sau là **terminal và absorbing**. Sau khi vào terminal,
+  **mọi** hành động của Player đó MUST bị từ chối: không Verify, không mua
+  Clue, không vẽ. Không ngoại lệ. Đây là bug nghiêm trọng nhất của native —
+  thua không xoá mã bí mật nên vẫn mua Clue và vẫn "thắng" lại được sau đó.
+- **R-T-03** Hết Score **không** phải terminal (R-S-09).
+- **R-T-04** Thứ hạng terminal, cao xuống thấp:
+
+```text
+  SOLVED  >  ELIMINATED  =  EXPIRED  >  FORFEITED
+```
+
+- **R-T-05** Match outcome:
+  1. **Cả hai `SOLVED`** → Score cao hơn thắng. Score bằng nhau → **Solve Time
+     sớm hơn** thắng. Bằng nhau cả hai → **Draw**.
+  2. **Đúng một `SOLVED`** → Player đó thắng, không xét Score.
+  3. **Không ai `SOLVED`, đúng một `FORFEITED`** → Player còn lại thắng.
+  4. **Không ai `SOLVED`, còn lại** → **Draw**, bất kể Score và bất kể lý do
+     terminal.
+- **R-T-06** Bỏ cuộc là **hành động chủ động, tường minh**. Nó là **thua**,
+  bất kể đối thủ đang ở state nào. Nếu bỏ cuộc chỉ đưa về `ELIMINATED` thì
+  người đang thua có thể **ép hoà** bằng cách bỏ cuộc khi đối thủ cũng chưa
+  Solve — R-T-04 xếp `FORFEITED` dưới cùng chính để bịt đường đó.
+- **R-T-07** Mất kết nối rồi không quay lại **không phải** bỏ cuộc: đồng hồ
+  chạy tiếp tới deadline rồi `EXPIRED`. Không thể phân biệt rage-quit với rớt
+  mạng, nên MUST NOT cố phân biệt.
+- **R-T-08** Ranked Match đang chạy MUST NOT bị huỷ hay reset bởi bất kỳ ai.
+  Native để `generateRandomPuzzle()` là lệnh huỷ diệt không xác nhận, gọi được
+  bất cứ lúc nào bởi bất kỳ client nào.
+
+Lý do nhánh Draw ở R-T-05.4: xếp hạng bằng Score còn lại sẽ thưởng cho người
+**không mua Clue**, tức thưởng cho việc không chơi.
+
+---
+
+## 8. Thông tin đối thủ
+
+- **R-T-09** Trong lúc Match đang chạy, một Player MUST chỉ thấy về đối thủ:
+  **trạng thái kết nối** (online/offline) và Match Clock chung.
+- **R-T-10** Score của đối thủ, số Clue đã mua, Player Board, và **việc đối thủ
+  đã Solve hay chưa** MUST NOT lộ ra trước khi Match kết thúc.
+
+Lý do R-T-10: biết đối thủ đã Solve sẽ biến phần còn lại thành đoán liều, mà
+theo R-V-08 đoán liều bị phạt — kết quả khi đó do ai nhận tín hiệu trước quyết
+định, không phải do suy luận.
+
+---
+
+## 9. Toàn vẹn
+
+Mục này đặt **ràng buộc luật chơi** lên threat model; nó không thay thế
+[Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12).
+
+- **R-I-01** Server là **authoritative** cho toàn bộ Score, Strike, Clue đã
+  mua, state và đồng hồ.
+- **R-I-02** Mã bí mật MUST NOT rời server: không trong payload, không trong
+  log, không trong response nào — kể cả sau khi Match kết thúc. Nó chỉ xuất
+  hiện ở màn kết quả như một giá trị hiển thị.
+- **R-I-03** Đáp án Clue MUST chỉ gửi cho **chính Player đã mua**.
+- **R-I-04** Mọi id MUST được kiểm bằng **whitelist chính xác**: `T..Y` cho
+  LED, đúng bảy cặp cho Q2, `A..S` cho bộ đếm. Id ngoài whitelist → lỗi tường
+  minh, không mất Score, không đổi state. Native "validate" bằng so sánh chuỗi
+  lexicographic nên `"AB"` lọt lưới và được xử lý như cột `A`.
+- **R-I-05** Input không hợp lệ MUST NOT bị nuốt im lặng. Native `return` lặng
+  lẽ ở nhiều nhánh, khiến người chơi tưởng đã hành động trong khi đồng hồ phạt
+  vẫn chạy.
+- **R-I-06** Một hành động của Player MUST mang đúng **một** nghĩa luật chơi.
+  Native để một lần bấm nút vừa trả lời Clue vừa đổi LED đang vẽ.
+
+---
+
+## 10. Ruleset và giá trị configurable
+
+- **R-K-01** Ruleset là một object **có tên và version**, đóng dấu vào **mọi**
+  Match record. Đổi bất kỳ giá trị nào ở R-K-02 là **bump version**.
+- **R-K-02** **Configurable**:
+
+| Tham số | Giá trị `1.0.0` |
+| --- | --- |
+| Score khởi đầu | 100 |
+| Giá Clue | 5 |
+| Chu kỳ hao mòn | 60 giây |
+| Deadline Match | 15 phút |
+| Phạt Wrong Guess lần đầu | −10 |
+| Thời lượng khoá Verify | 10 giây |
+| Số Strike tối đa | 2 |
+| Ranked loại collision | bật |
+
+- **R-K-03** **Không configurable** — đổi là đổi trò chơi, MUST sửa spec và
+  bump minor/major: hình học bàn 2×3, catalogue Clue và semantics của Q1/Q2/Q3,
+  ba ràng buộc sinh mã (R-P-04), và điều kiện kích hoạt Solve (R-V-01).
+- **R-K-04** Elo chỉ so sánh được giữa các Match **cùng `ruleset_id`**. Chính
+  sách khi ruleset đổi thuộc
+  [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15).
+
+---
+
+## 11. Đối chiếu: 20 hành vi native cấm đóng băng
+
+Danh sách gốc ở `native-behaviors.md` mục 2 của #6. Cột cuối là cách spec này
+xử lý — không mục nào bị port.
+
+| # | Hành vi native | Spec xử lý |
+| --- | --- | --- |
+| 1 | Thắng tự động khi bàn cờ khớp mã | Bỏ. R-V-01, R-V-02 |
+| 2 | Auto-fill không kích hoạt kiểm tra thắng | Không tồn tại. R-C-09 bỏ auto-fill; R-V-01 bỏ auto-detect |
+| 3 | `hold = 2` được VERIFY nhận nhưng auto-detect từ chối | Không tồn tại. R-B-01 chỉ hai trạng thái; chỉ còn một đường Solve |
+| 4 | Thua không xoá mã bí mật (không có terminal) | Bỏ. R-T-02 terminal absorbing |
+| 5 | `pauseGame`/`resumeGame` | Bỏ. R-S-03 |
+| 6 | Kiểm tra thua chỉ chạy trong slot timer | Không tồn tại. R-S-07/09 bỏ hẳn nhánh thua vì hết Score |
+| 7 | Sai lần 1 không mất gì, phần cứng không nhận phản hồi | Bỏ. R-V-08, R-V-11 |
+| 8 | Q4 tính tiền câu trùng, Q1–Q3 thì không | Không tồn tại. R-C-02 bỏ Q4; R-C-13 thống nhất mọi họ |
+| 9 | Q3 khoá Q4 nhưng Q4 không khoá Q3 | Không tồn tại. R-C-02 |
+| 10 | Nhánh `'='` của Q2 và fallback `return 0` | Bỏ. R-C-06 |
+| 11 | Bias phân phối của rejection sampler | Bỏ. R-P-07, R-P-08 |
+| 12 | Validate id bằng so sánh chuỗi | Bỏ. R-I-04 |
+| 13 | WebSocket không xác thực, broadcast đáp án | Bỏ. R-I-01, R-I-02, R-I-03, R-T-10 |
+| 14 | In mã bí mật ra log | Bỏ. R-I-02 |
+| 15 | −1 mỗi 60 giây, không deadline | Quyết định lại có chủ ý: R-S-05 giữ 60 giây (lý do ở R-S-11), R-S-06 thêm deadline |
+| 16 | Một nút vừa trả lời Clue vừa chọn LED | Bỏ. R-C-10, R-I-06 |
+| 17 | State ván cũ rò sang ván mới | Không tồn tại. R-P-13 Puzzle gắn Match; R-T-08 cấm reset |
+| 18 | Code chết (`m_backups`, `DraftGrid`, …) | Không port. Ghi chú nháp nếu có là thuần client, R-B-03 |
+| 19 | Giá phẳng 5 điểm kể cả Clue suy ra được | Giữ có chủ ý. R-C-12, R-C-14 — lý do ở R-C-14 |
+| 20 | Auto-fill khi FULL làm hộ thao tác vẽ | Bỏ. R-C-09 |
+
+Mục 15 và 19 là hai mục spec **cố ý giữ giá trị của native**, nhưng là quyết
+định chủ động kèm lý do, không phải kế thừa mặc định.
+
+---
+
+## 12. Spec này KHÔNG quyết định
+
+Thuộc ticket khác, MUST tôn trọng luật ở trên:
+
+| Vấn đề | Ticket |
+| --- | --- |
+| Match lifecycle chi tiết, reconnect handshake, concurrency/idempotency | [#4](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) |
+| Threat model, anti-cheat, rate limit | [#12](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) |
+| Elo: Draw settlement, provisional, đối thủ lặp lại, correction | [#15](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) |
+| Data model, lịch sử đấu, quyền riêng tư | [#14](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/14) |
+| UX cụ thể của Player Board, Clue và Verify | [#13](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/13) |
+| Repo topology và coexistence với Qt/ESP32 | [#11](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/11) |
+
+Ràng buộc R-P-14/R-I-02 (mã bí mật không rời server) và R-S-04/R-T-07 (đồng hồ
+không dừng khi mất kết nối) là **đầu vào cứng** cho #4 và #12.
+
+---
+
+## 13. Invariant mà test MUST ghim
+
+Mỗi dòng dưới đây kiểm chứng được mà không cần chạy web app:
+
+1. Tập mã hợp lệ có đúng **465.120** phần tử; pool Ranked có đúng **464.948**.
+2. Đúng **86** cặp collision, và cả 86 thuộc họ đổi cột đã mô tả ở R-P-11.
+3. Lấy mẫu Ranked là uniform: mọi mã trong pool có xác suất bằng nhau, kiểm
+   bằng số học chính xác chứ không bằng tần suất.
+4. `A..I` và `J..S` mỗi bên phủ đúng 42 ô LED×segment, mỗi ô đúng một lần.
+5. Miền đáp án của cả 19 bộ đếm đúng như bảng ở R-C-07.
+6. Không mã hợp lệ nào khiến Q2 trả `EQUAL`.
+7. Mua đủ 32 Clue tốn 160 Score > 100 — không ván nào mua hết được.
+8. Ở deadline 15:00 với hao mòn 60 giây, trần là **17** lần mua; với hao
+   mòn 30 giây là **14**. Dưới luật native "Score ≤ 0 là thua" hai con số
+   này là 16 và 13 — chênh lệch đúng bằng hệ quả của R-S-09.
+9. Mọi hành động sau terminal đều bị từ chối, với cả bốn terminal state.
+10. Verify trên Player Board không giải mã được không làm đổi Score lẫn Strike.
