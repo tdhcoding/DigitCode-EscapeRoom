@@ -1,15 +1,37 @@
 # Triage Labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+Mọi issue đã triage mang **đúng một nhãn phân loại** và **đúng một nhãn trạng thái**.
+Hai trục độc lập nhau: phân loại nói issue *là gì*, trạng thái nói nó *đang chờ ai*.
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
-| `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
-| `needs-info`               | `needs-info`         | Waiting on reporter for more information |
-| `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
-| `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
-| `wontfix`                  | `wontfix`            | Will not be actioned                     |
+Nhãn dưới đây là nhãn có thật trong `tdhcoding/DigitCode-EscapeRoom`.
+Kiểm chứng: `gh label list`
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
+## Trục phân loại
 
-Edit the right-hand column to match whatever vocabulary you actually use.
+| Nhãn | Nghĩa |
+| --- | --- |
+| `bug` | Có thứ đang hỏng |
+| `enhancement` | Tính năng mới hoặc cải tiến |
+| `documentation` | Chỉ động tới tài liệu |
+
+## Trục trạng thái
+
+| Nhãn | Nghĩa |
+| --- | --- |
+| `needs-triage` | Chưa phân loại — cần người đánh giá |
+| `needs-info` | Đang chờ thêm thông tin từ người báo |
+| `ready-for-agent` | Đã đặc tả đủ, agent chạy AFK được |
+| `ready-for-human` | Cần người tự làm, không giao agent |
+| `wontfix` | Sẽ không xử lý |
+
+Khi một skill nhắc tới vai trò (ví dụ "apply the AFK-ready triage label"),
+dùng chuỗi nhãn tương ứng ở bảng trên.
+
+## Thêm nhãn mới
+
+Tạo trên GitHub trước, rồi mới thêm dòng vào đây — file này mô tả tracker,
+không định nghĩa nó:
+
+```sh
+gh label create <tên> --color <hex> --description "..."
+```
