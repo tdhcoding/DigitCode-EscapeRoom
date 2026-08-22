@@ -25,7 +25,7 @@ qt_add_qml_module(appDigitCode_SINGLE
         UI/LedDisplay.qml
         UI/LogicButton.qml
         UI/CounterBox.qml
-        UI/EODot.qml
+        UI/EoDot.qml
         UI/CmpArrow.qml
         UI/BottomBoard.qml
         UI/DraftGrid.qml
