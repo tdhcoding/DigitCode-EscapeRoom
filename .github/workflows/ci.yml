@@ -1,0 +1,43 @@
+name: CI
+
+# Chạy trên Ubuntu là có chủ đích: filesystem của Linux phân biệt hoa/thường,
+# nên CI bắt được lỗi sai case tên file QML mà macOS/Windows nuốt im lặng
+# (đúng loại lỗi UI/EODot.qml -> UI/EoDot.qml đã lọt tới tận commit bd0dbac).
+
+on:
+  push:
+    branches: [main, develop, 'feat/**', 'fix/**', ui-redesign]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build desktop (Qt6 / CMake)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cài thư viện hệ thống Qt cần khi cấu hình
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            libgl1-mesa-dev \
+            libxkbcommon-dev \
+            libxkbcommon-x11-dev \
+            libvulkan-dev
+
+      - name: Cài Qt 6.10
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.0'
+          modules: qtwebsockets
+          cache: true
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
