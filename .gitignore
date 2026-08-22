@@ -89,11 +89,14 @@ build-*/
 *.user.*
 .qmake.stash
 
-# Claude Code skill tooling (local, not project source)
-/.agents/
+# Claude Code skill tooling
+# Skills ĐƯỢC commit để mọi máy / mọi agent dùng đúng một phiên bản.
+# .claude/skills/* là symlink tương đối trỏ sang ../../.agents/skills/*
+# Chỉ loại trừ phần thực sự cục bộ của từng máy:
+/.claude/settings.local.json
+/.claude/worktrees/
+# agent/ là bản trùng của .agents/skills ở định dạng frontmatter khác - không dùng
 /agent/
-/.claude/
-/skills-lock.json
 
 # Thông tin mạng thật (WiFi SSID/password) - xem secrets.h.example
 firmware/DigitCodeFirmware/secrets.h
