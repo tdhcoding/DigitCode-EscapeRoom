@@ -65,7 +65,8 @@ deterministic.
   thời gian chạy + môi trường.
 - Mỗi invariant kiểm bằng ≥ 2 đường độc lập khi khả thi (ví dụ: đếm secret bằng
   brute force 10^6 **và** bằng DP theo vị trí).
-- `python3 -m unittest tools.analysis.test_analysis -v`.
+- `python3 tools/analysis/test_analysis.py` (`tools/` không phải package nên
+  chạy trực tiếp, không dùng `-m unittest`).
 - `git diff --check`.
 - Không rebuild Qt (không đụng C++/CMake/QML).
 
