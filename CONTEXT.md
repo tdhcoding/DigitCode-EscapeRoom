@@ -69,7 +69,7 @@ A Match outcome in which neither Player is ranked above the other.
 _Avoid_: Tie, stalemate, no result
 
 **Match Clock**:
-The single wall-clock timer of a Match, running from Match start. Score decay, the deadline, and Solve Time all read from it. It never pauses.
+The single wall-clock timer of a Match, running from Match Start. Score decay, the deadline, and Solve Time all read from it. It never pauses.
 _Avoid_: Timer, game clock, play time
 
 **Solve Time**:
@@ -79,3 +79,31 @@ _Avoid_: Clear time, elapsed time, duration
 **Ruleset**:
 The named, versioned set of game parameters a Match was played under. Every Match record carries one, and only Matches sharing a Ruleset are comparable for Elo.
 _Avoid_: Config, settings, rules
+
+**Room**:
+The durable meeting place a Room Owner opens to invite one opponent, fixing the mode before any Match exists. A Room outlives the Matches played in it.
+_Avoid_: Lobby, session, game, match
+
+**Room Owner**:
+The Player who created a Room. Ownership confers the right to close the Room while it holds no unfinished Match, and nothing more.
+_Avoid_: Host, admin, creator
+
+**Invite Code**:
+The single short secret that admits one opponent to a Room, shared either as a bare code or embedded in a link. It is consumed permanently at Match Start and is never reissued.
+_Avoid_: Room code, token, link, password
+
+**Seat**:
+One of a Room's two places, held by a Player rather than by a device or connection. One Player never holds both Seats, and one Seat may be watched from several devices at once.
+_Avoid_: Slot, connection, session, client
+
+**Match Start**:
+The single moment at which a Match comes into existence: its Puzzle is generated, its Ruleset is stamped, its Invite Code dies, and its Match Clock is scheduled. Nothing may cancel a Match afterwards.
+_Avoid_: Kickoff, game start, countdown, ready
+
+**Rematch**:
+A further Match played in the same Room, on a new Puzzle, agreed to by both Players. It is always a new Match record, never a replay of an old one.
+_Avoid_: Replay, restart, next round
+
+**Player Tag**:
+The short immutable label carried alongside a Player's display name, which distinguishes Players who chose the same name. Display names are never shown without it.
+_Avoid_: Username, handle, discriminator, ID
