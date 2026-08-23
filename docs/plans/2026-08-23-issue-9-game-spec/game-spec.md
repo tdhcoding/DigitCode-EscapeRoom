@@ -278,9 +278,28 @@ Ngân sách suy ra từ R-S-01, R-S-05, R-S-06 và R-C-12:
   tốt nhất đã biết, nên ở những Puzzle khó nhất, người chơi giỏi nhất vẫn buộc
   phải đoán **theo chiến lược tốt nhất mà #6 trưng ra được**. Ở 60 giây, trần
   17 phủ được worst case đó với đúng một lần mua dư.
-  Biên độ đó mỏng có chủ ý, và 16 mới chỉ là chặn trên heuristic — #6 chưa đóng
-  khoảng `[8, 16]`, nên cây tối ưu có thể cần ít hơn, không bao giờ cần nhiều
-  hơn.
+  Biên độ đó mỏng có chủ ý, và 16 mới chỉ là chặn trên heuristic — cây tối ưu
+  có thể cần ít hơn, không bao giờ cần nhiều hơn.
+
+  **Bổ sung sau khi #6 đóng** (`docs/plans/2026-08-24-clue-bounds/findings.md`,
+  mục 2.3 và 2.4). Khoảng `[8, 16]` mà đoạn trên nhắc tới đã thu hẹp về
+  `[10, 16]`; chặn dưới 10 là EXACT, chặn trên 16 vẫn là HEURISTIC. Chặn trên
+  16 **tái lập được độc lập** — ba luật phá hoà khác nhau và nhiều clue mở đầu
+  khác nhau đều đạt 16 — nên lập luận của R-S-11 đứng vững: cây tối ưu không
+  bao giờ cần **hơn** 16, và trần 17 phủ được nó.
+
+  Nhưng biên "dư đúng một lần mua" chỉ đúng với **cây tốt nhất đã biết**, không
+  đúng với một chiến lược greedy bất kỳ. Quét 4 luật phá hoà × 32 clue mở đầu
+  (128 lượt dựng cây đầy đủ) cho: **30 lượt đạt 16, 88 lượt cho 17, 10 lượt cho
+  18**. Nghĩa là 98/128 cấu hình greedy hợp lý **dùng sạch trần 17 hoặc vượt
+  nó**. Con số 16 mà R-S-11 dựa vào là thiểu số trong họ chiến lược của chính
+  nó, và nó phụ thuộc một quy tắc phá hoà mà #6 **không ghi lại**.
+
+  Điều này **không** đảo kết luận chọn 60 giây: ở 30 giây trần là 14, thấp hơn
+  cả chặn trên 16 lẫn worst case 17 của đa số cấu hình greedy. 60 giây vẫn là
+  lựa chọn đúng trong hai lựa chọn. Đoạn này chỉ ghi lại rằng **lý do** mỏng
+  hơn con số "dư 1" ngụ ý, để ticket sau không thừa kế một biên an toàn không
+  có thật.
 
 ---
 
