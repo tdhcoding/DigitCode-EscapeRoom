@@ -31,9 +31,11 @@ thực sự mô tả là "cap số rated Match cho mỗi **unordered pair** tron
 [#4](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) Q12 vừa chốt
 rằng room chết 10 phút sau Match và **owner đóng sớm được bất cứ lúc nào room
 không còn Match chưa terminal**. Ghép ba dòng đó lại: cùng một cặp account chỉ cần
-**đóng room rồi mở room mới** là được thêm 5 trận nữa, giá đúng ba command. Cap 5
-là **ma sát**, không phải **chặn trên** — nó không bao giờ là thứ #2 nghĩ nó là.
-Xem D.3.
+**đóng room rồi mở room mới** là được thêm 6 trận nữa. Và chi phí biên thật của
+việc đó là **đúng một command** (`CLOSE_ROOM`) — vì `CREATE_ROOM` + `JOIN_ROOM`
+chỉ thay chỗ cho `PROPOSE_REMATCH` + `ACCEPT_REMATCH` mà một rematch vốn đã tốn.
+Trên 869 trận, cả cái cap tốn thêm **2,4%** số command. Cap 5 là **ma sát**,
+không phải **chặn trên** — nó không bao giờ là thứ #2 nghĩ nó là. Xem D.3.
 
 ---
 
@@ -137,7 +139,8 @@ secret :  15  296  2216  10070  28279  57337  89102  106811  95226  57281  17633
 | p99 | 15 | khớp R-P-16 |
 | Miền `[10, 14]` | **87,24%** số Puzzle | |
 | Miền `[11, 13]` | **62,59%** số Puzzle | |
-| Toàn miền `[5, 16]` | 55 điểm Score | nhưng hai đuôi cộng lại < 2,8% |
+| Toàn miền `[5, 16]` | 55 điểm Score | nhưng chỉ **12,76%** nằm ngoài `[10, 14]` |
+| Hai đuôi (`≤ 8` và `≥ 15`) | **6,68%** | 2,71% + 3,97% |
 
 ⇒ **Thang độ khó tồn tại, và nó rẻ để sản xuất.** Một lượt dựng cây đầy đủ gán
 độ sâu cho **mọi** secret; `bounds_adaptive_search.py sweep` chạy **128 lượt trong
@@ -576,8 +579,10 @@ Ranked**, và ghi lý do là "**không tạo ra một đường rematch vô hạ
   trong một **window**"* — **theo cặp**, không theo room.
 - #4 Q12 chốt room chết **10 phút** sau Match, và **owner đóng sớm được** bất cứ
   lúc nào room không còn Match chưa terminal.
-- ⇒ cùng một cặp account chỉ cần **đóng room, mở room mới** là có thêm 5 trận.
-  Giá: **ba command** (`CLOSE_ROOM`, `CREATE_ROOM`, `JOIN_ROOM`) mỗi 5 trận.
+- ⇒ cùng một cặp account chỉ cần **đóng room, mở room mới** là có thêm 6 trận.
+  Giá danh nghĩa ba command (`CLOSE_ROOM`, `CREATE_ROOM`, `JOIN_ROOM`), nhưng
+  **chi phí biên thật là một** — hai command kia thay chỗ cho
+  `PROPOSE_REMATCH` + `ACCEPT_REMATCH` của một rematch. Trên 869 trận: **+2,4%**.
 
 **Cap 5 là ma sát, không phải chặn trên.** Xem D.3 cho phép tính đầy đủ.
 
@@ -690,23 +695,38 @@ chạm** cột 2 — nó đẩy kẻ tấn công sang đúng đường tệ hơn
 
 **Chi phí thời gian và hạ tầng của một trận farm.** Đường rẻ nhất là donor
 `FORFEIT` ngay sau Match Start (R-T-05.3 cho winner **đúng cùng lượng Elo** như
-Solve — dữ kiện 3 của #25). Command của một trận: `CREATE_ROOM`, `JOIN_ROOM`,
-`READY` ×2, `FORFEIT` = **5 command** (finalization là **hệ quả**, không phải
-command — #4 Q8).
+Solve — dữ kiện 3 của #25). **Nhưng `FORFEIT` của donor một mình KHÔNG kết thúc
+Match**: R-T-11 đòi **cả hai** Player terminal. Nên người bơm cũng phải tự đưa
+mình vào terminal, và đường nhanh nhất là **hai `VERIFY` sai** → `ELIMINATED`
+(R-V-08 khoá 10 giây giữa hai lần — đây chính là nguồn của con số "~15 giây mỗi
+trận" ở dữ kiện 2 của #25). `FORFEITED` xếp **dưới** `ELIMINATED` (R-T-04) nên
+người bơm vẫn thắng theo R-T-05.3.
+
+Command của một trận, **đúng bảy**, cho cả trận đầu lẫn rematch (finalization là
+**hệ quả**, không phải command — #4 Q8):
 
 ```text
-869 trận (một donor)  ≈ 4.345 command ≈ 0,87% ngân sách 500.000 invocation
-111 trận (23 donor)   ≈   555 command ≈ 0,11% ngân sách
+trận đầu trong room : CREATE_ROOM, JOIN_ROOM, READY x2, FORFEIT, VERIFY x2   = 7
+rematch             : PROPOSE_REMATCH, ACCEPT_REMATCH, READY x2, FORFEIT, VERIFY x2 = 7
+mỗi lần thay room   : + CLOSE_ROOM                                            = 1
+
+869 trận (một donor, cap 5 => 6 trận/room => 145 room)
+    = 869 x 7 + 145 = 6.228 command = 1,25% ngân sách 500.000 invocation
+111 trận (23 donor => 23 room, cộng 11 trận Practice cho eligibility của donor)
+    = 111 x 7 + 22 + 77  ≈   876 command = 0,18% ngân sách
 ở 15 giây/trận: 869 trận ≈ 3,6 giờ  |  111 trận ≈ 28 phút
 ```
 
 **Ba kết luận đáng nói ra:**
 
-1. **Ngân sách zero-cost KHÔNG chặn được việc farm.** Toàn bộ chiến dịch tốn dưới
-   **1%** ngân sách invocation. Đừng nhầm ràng buộc chi phí thành một control.
-2. **Rate limit của #8 cũng không chặn.** 20 command/phút/actor: người bơm chỉ
-   phát **2** command mỗi trận (`CREATE_ROOM`, `READY`) ⇒ trần 10 trận/phút — xa
-   trên nhu cầu.
+1. **Ngân sách zero-cost KHÔNG chặn được việc farm.** Toàn bộ chiến dịch tốn
+   **1,25%** ngân sách invocation — và đó là đường **đắt nhất** trong hai đường;
+   đường 23 donor chỉ tốn **0,18%**. Đừng nhầm ràng buộc chi phí thành một control.
+2. **Rate limit của #8 cũng không chặn.** 20 command/phút/actor: người bơm phát
+   **4** command mỗi trận (`CREATE_ROOM`/`PROPOSE_REMATCH`, `READY`, `VERIFY` ×2)
+   ⇒ trần **5 trận/phút**; donor phát 3 ⇒ trần 6,7 trận/phút. Biên mỏng hơn vẻ
+   ngoài, nhưng vẫn **xa trên** tốc độ một người thật bấm được, nên kết luận
+   không đổi.
 3. **Thứ thật sự làm chậm là cap của #2**: 1 room + 1 Match chưa terminal, giữ
    bằng **partial unique index** (#4 Q10). Nó **serialize** hoàn toàn: một trận
    một lúc, không song song hoá được. Con số 3,6 giờ ở trên **là nhờ nó**. Đây là
@@ -744,13 +764,19 @@ nằm đâu đó trong **`[10, 16]`**.
 #2  Q7.4     : mã đã chết không tái dùng  ->  room mới cần mã mới, KHÔNG cản gì
 #2  Q5       : 1 room đang mở mỗi account ->  phải đóng trước khi mở, KHÔNG cản gì
 
-=> reset cap: CLOSE_ROOM + CREATE_ROOM + JOIN_ROOM = 3 command, không chờ 10 phút
-=> chi phí biên mỗi 5 trận: +3 command  (+60% command, ~0 giây)
+=> reset cap: CLOSE_ROOM + CREATE_ROOM + JOIN_ROOM, không chờ 10 phút
+   nhưng CREATE_ROOM + JOIN_ROOM chỉ THAY CHỖ cho PROPOSE_REMATCH + ACCEPT_REMATCH
+   mà một rematch vốn đã tốn  ->  chi phí biên thật chỉ là 1 CLOSE_ROOM
 => cap 5 theo room  ->  ma sát,  KHÔNG phải chặn trên
 ```
 
-Với 869 trận ở D.1 bảng 2: cap 5 thêm **174 chu kỳ room** = **522 command** phụ,
-nâng tổng từ 4.345 lên 4.867 — vẫn **dưới 1%** ngân sách. Không đổi kết luận nào.
+Định lượng, dùng đúng con số của D.1. "Cap 5 rematch" nghĩa là **6 trận mỗi room**
+(một trận đầu + 5 rematch). Với 869 trận: **145 chu kỳ room** ⇒ **+145 `CLOSE_ROOM`**
+trên nền 6.083 command, tức **+2,4%**. Chi phí biên của cả cái cap là **hai phần
+trăm**, và không tốn giây nào.
+
+Đây là con số nói lên tất cả: cap 5 không nâng giá đủ để đổi hành vi của bất kỳ
+ai.
 
 **Đây là bẫy "bê con số mà bỏ mất tiền đề", lần thứ năm trên map này.** Con số 5
 đúng cho mục đích của #2. Nó **không** là chặn trên Elo, và #15 sẽ thừa kế nó kèm
@@ -773,8 +799,12 @@ chuỗi:  #25 -> #15 -> #14 -> {#3, #13}
 ```
 
 ⇒ **#25 chặn bắc cầu 7 ticket**: #15, #14, #3, #13, #11, #7, #16 — tức **mọi
-ticket mở còn lại trừ #12, #17, #27**. So sánh: #12 chặn 2 (#3, #16), #17 chặn 2
-(#3, #16), #27 chặn 1 (#3).
+ticket mở còn lại trừ #12, #17, #27**.
+
+So sánh **cùng đơn vị bắc cầu** (không so bắc cầu với trực tiếp): #12, #17 và #27
+mỗi cái chặn bắc cầu **4** ticket — tất cả đều đi qua #3 rồi toả ra #11, #7, #16.
+Nên khoảng cách là **7 so với 4**, không phải "7 so với 1". Kết luận nút cổ chai
+không đổi, nhưng đừng trích con số mà bỏ mất đơn vị của nó.
 
 **#25 là nút cổ chai thật của nửa dưới map**, và đóng nó là hành động mở khoá lớn
 nhất còn lại.
@@ -816,6 +846,7 @@ Players"), **Player** ("an authenticated person"). Kéo theo **Ranked Match**,
 | Q5 "hoạt động gần đây" của đối thủ | **Không** — bot luôn hoạt động |
 | Q7/Q8 finalization khi **cả hai** terminal (R-T-11) | **Phải định nghĩa lại** — bot terminal lúc nào? |
 | Q12 rematch cả hai đề nghị được | **Không** |
+| Q4 multi-tab / multi-device trên một ghế | **Còn nguyên** — vẫn áp cho người thật |
 | Q1, Q6, Q9, Q10, Q11, Q13, Q14 | **Còn nguyên** |
 
 **Từ [#10](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/10):** nếu bot
@@ -826,13 +857,15 @@ thật, và là lý do duy nhất nhánh (4) hấp dẫn về mặt Elo. Nhưng 
 người đấu **nhiều bot song song** — trừ khi cap 1 Match chưa terminal của #2 được
 giữ nguyên cho cả bot.
 
-**Đếm được, không ước lượng.** Trên bảng trên: **năm** quyết định của #2 và
-**sáu** quyết định của #4 cần một biến thể riêng cho đường bot, và trong số đó
-**bốn** cái — ready hai chiều (#4 Q2), mốc đồng bộ 3 giây (#4 Q2b), rematch cần
-cả hai đồng ý (#2 Q11, #4 Q12), và finalization khi **cả hai** terminal (R-T-11)
-— **dựa thẳng vào việc có hai con người**, nên chúng không có biến thể bot mà chỉ
-có một thiết kế mới. Bảy quyết định còn lại của #4 (Q1, Q6, Q9, Q10, Q11, Q13,
-Q14) đứng nguyên.
+**Đếm được, không ước lượng.** #4 chốt **15** quyết định (Q1–Q14 cộng Q2b). Bảng
+trên phân loại đủ cả 15: **bảy** cần một biến thể riêng cho đường bot (Q2, Q2b,
+Q3, Q5, Q7, Q8, Q12) và **tám** đứng nguyên (Q1, Q4, Q6, Q9, Q10, Q11, Q13, Q14).
+Phía #2, **năm** quyết định cần xét lại.
+
+Trong bảy cái phải làm lại, **bốn** cái — ready hai chiều (Q2), mốc đồng bộ 3 giây
+(Q2b), rematch cần cả hai đồng ý (Q12, và #2 Q11), và finalization khi **cả hai**
+terminal (Q8 / R-T-11) — **dựa thẳng vào việc có hai con người**. Chúng không có
+biến thể bot mà chỉ có một thiết kế mới.
 
 Đó là **hai ticket đã đóng** phải mở lại một phần. Theo `wayfinder`, việc đó không
 phải "resolve thêm một ticket" mà là **vẽ lại một phần map đã đi qua** — và một
