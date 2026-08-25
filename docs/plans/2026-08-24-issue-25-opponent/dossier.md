@@ -5,6 +5,19 @@ Map: [Wayfinder: DigitCode web multiplayer production MVP](https://github.com/td
 Branch: `feat/issue-25-opponent-prep`
 Soạn: phiên AFK 2026-08-24 (không có người ngồi cùng).
 
+> **KẾT CỤC — đọc trước khi trích bất cứ dòng nào từ phần (C).**
+> Buổi grilling ngày 2026-08-25 đã **bác phần lớn khuyến nghị** của tài liệu này.
+> Người chủ map chọn vẽ lại destination: **Ranked rời khỏi Room và chỉ đến từ một
+> hàng đợi, với Bot Opponent làm đường lui.** Cụ thể, C-Q6 chọn *có đối thủ máy*
+> (dossier khuyến nghị *không*), C-Q1 không chọn nhánh nào trong hai nhánh dossier
+> đưa ra, C-Q3 **không chấp nhận** rủi ro tự đấu (dossier khuyến nghị chấp nhận),
+> và C-Q8 kết luận cap 5 đã **chết** cùng với room Ranked.
+>
+> Phần **(A)** ràng buộc kế thừa và phần **(D)** dữ kiện đã tra vẫn **đúng và đã
+> được dùng suốt buổi** — chỉ phần **(C)** khuyến nghị là hết hiệu lực.
+> Quyết định thật nằm ở **resolution comment của
+> [#25](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/25)**.
+
 ## Tài liệu này là gì
 
 Đây là **phần AFK của một ticket `wayfinder:grilling`**: gom hết ràng buộc đã có,
