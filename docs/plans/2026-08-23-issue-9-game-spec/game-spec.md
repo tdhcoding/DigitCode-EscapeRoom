@@ -23,9 +23,10 @@ khác native, spec này thắng.
 
 ## 1. Từ vựng
 
-Dùng đúng từ vựng ở [`CONTEXT.md`](../../../CONTEXT.md) tại repo root. Chín
+Dùng đúng từ vựng ở [`CONTEXT.md`](../../../CONTEXT.md) tại repo root. Mười ba
 thuật ngữ mà spec này chốt và đã đưa vào glossary: Clue, Player Board, Verify,
-Strike, Forfeit, Draw, Match Clock, Solve Time, Ruleset.
+Strike, Forfeit, Draw, Match Clock, Solve Time, Ruleset, Bot State, Bot Score,
+Bot Submission, Bot Terminal Status.
 
 Một quy ước đọc: **Puzzle** là bí mật cộng các fact suy ra từ nó; **Player
 Board** là thứ người chơi vẽ. Hai thứ này không bao giờ là một — native làm
@@ -95,7 +96,7 @@ lại toàn bộ chi phí clue) hoặc đổi luật đoán sai (không xoá đ�
 ### 2.5 Định danh và phân phát
 
 - **R-P-13** Một Match có **đúng một** Puzzle, sinh lúc tạo Match, dùng chung
-  cho cả hai Player.
+  cho Player và Opponent.
 - **R-P-14** Puzzle MUST được giữ server-side và MUST được lưu bền cùng Match.
   Client nhận một `puzzle_id` **mờ**, và chỉ sau khi Match kết thúc (R-T-11).
   Hình dạng bản ghi thuộc [#14](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/14).
@@ -244,7 +245,7 @@ Mười dải **hàng** (mỗi dải phủ ba LED cùng hàng):
   **dừng** ngay khi Player đó vào terminal state: Score của họ được đóng băng
   làm bản ghi (R-V-06, R-V-10).
 - **R-S-06** Deadline của Match là **15 phút** Match Clock, áp cho cả hai
-  Player.
+  phía: Player và Opponent.
 - **R-S-07** Score MUST NOT xuống dưới **0**. Hao mòn thời gian và phạt Wrong
   Guess đều dừng ở 0.
 - **R-S-08** Mua Clue khi Score < 5 MUST bị từ chối tường minh. Không mua
@@ -305,8 +306,8 @@ Ngân sách suy ra từ R-S-01, R-S-05, R-S-06 và R-C-12:
 
 ## 6. Verify và Wrong Guess
 
-- **R-V-01** Đường Solve **duy nhất** là hành động **Verify tường minh** do
-  Player phát ra.
+- **R-V-01** Đường Solve **duy nhất của Player** là hành động **Verify tường
+  minh** do Player phát ra.
 - **R-V-02** Player Board khớp mã bí mật MUST NOT tự kích hoạt thắng. Native
   cho thắng ngay khi bàn cờ khớp, khiến đoán bằng cách vẽ trở nên **miễn phí
   và vô hạn lượt** và biến toàn bộ chính sách Wrong Guess thành trang trí:
@@ -338,6 +339,61 @@ Ngân sách suy ra từ R-S-01, R-S-05, R-S-06 và R-C-12:
 
 ---
 
+## 6A. Bot Opponent contract
+
+- **R-BOT-01** Bot Opponent MUST NOT là Player và MUST NOT có Player Board.
+  Trạng thái riêng của nó là **Bot State**.
+- **R-BOT-02** Bot Opponent nhận cùng Puzzle theo R-P-13 và được mua đúng cùng
+  catalogue **32 Clue thật** ở R-C-01, với cùng giá, duplicate policy và quyền
+  đọc lại. Đáp án Clue MUST được tính server-side và chỉ đưa vào Bot State của
+  Bot Opponent đã mua; mã bí mật MUST NOT được đưa cho Bot Opponent. Mua Clue
+  khi Bot Score < 5 MUST bị từ chối tường minh, miễn phí và không đổi Bot State.
+- **R-BOT-03** **Bot Score** tại thời điểm `t` là:
+
+  ```text
+  max(0, 100 - 5 × số Clue đã mua
+             - floor(t / 60 giây)
+             - 10 × số Bot Submission sai)
+  ```
+
+  `t` đọc từ Match Clock và dừng tại thời điểm Bot Opponent vào terminal. Bot
+  Score MUST đóng băng ở thời điểm đó và MUST NOT xuống dưới 0.
+- **R-BOT-04** Bot Opponent dùng cùng Match Clock, cùng deadline **15 phút** và
+  cùng quy tắc không Pause. Khi Match Clock chạm 15:00 mà Bot Opponent còn
+  `ACTIVE`, Bot Terminal Status của nó chuyển thành `EXPIRED`.
+- **R-BOT-05** **Bot Submission** là đường duy nhất có thể đưa Bot Opponent tới
+  `SOLVED`. Bot Submission đúng Puzzle MUST ghi bền Bot Score và Solve Time rồi
+  đặt Bot Terminal Status thành `SOLVED`. Không trạng thái nội bộ hay suy luận
+  đúng nào được tự kích hoạt Solve.
+- **R-BOT-06** Bot Submission không phải mã sáu chữ số hợp lệ MUST bị từ chối
+  tường minh, miễn phí và không đổi Bot State. Bot Submission hợp lệ nhưng sai
+  Puzzle MUST trừ **10 Bot Score** với sàn 0. Lần sai thứ nhất khoá riêng Bot
+  Submission trong **10 giây Match Clock**; lần sai thứ hai đặt Bot Terminal
+  Status thành `ELIMINATED`. Bot Submission trong cửa sổ khoá MUST bị từ chối
+  tường minh, miễn phí và không đổi Bot State; Bot Opponent vẫn được mua Clue.
+- **R-BOT-07** Bot Opponent bắt đầu `ACTIVE`. Bot Terminal Status chỉ có
+  `SOLVED`, `ELIMINATED` hoặc `EXPIRED`; Bot Opponent MUST NOT có `FORFEITED`.
+  Cả ba status là terminal và absorbing: sau đó mọi hành động làm đổi Bot State
+  MUST bị từ chối, còn Clue đã mua vẫn đọc lại được.
+- **R-BOT-08** Thứ tự outcome và tiebreak ở R-T-04 và R-T-05 áp dụng không đổi
+  khi Opponent là Bot Opponent. Khi cả hai Solve, Score của Player được so với
+  Bot Score; bằng nhau thì Solve Time sớm hơn thắng, rồi mới Draw.
+- **R-BOT-09** Match có Bot Opponent chỉ kết thúc khi Player ở terminal state
+  và Bot Opponent có Bot Terminal Status. Một phía terminal sớm không kết thúc
+  Match.
+- **R-BOT-10** Trong khi Match đang chạy, Player và Bot Opponent MUST bị che
+  thông tin đối ứng: Player không thấy Bot State, Bot Score, Clue đã mua, Bot
+  Submission hay Bot Terminal Status; Bot Opponent không nhận Player State,
+  Score, Clue đã mua, Player Board, Verify hay terminal state. Bot Opponent
+  MUST luôn được gắn nhãn nhìn thấy rõ và MUST NOT được trình bày trạng thái
+  kết nối giả.
+- **R-BOT-11** Server là authoritative cho toàn bộ Bot State, Bot Score, Bot
+  Submission và Bot Terminal Status. Chỉ sau khi Match kết thúc theo R-BOT-09,
+  kết quả cuối mới MUST công bố mã bí mật, terminal state của Player, Bot
+  Terminal Status, Score, Bot Score, các Solve Time có tồn tại và Match outcome.
+
+---
+
 ## 7. Terminal state và Match outcome
 
 - **R-T-01** Mỗi Player trong Match có đúng một trạng thái:
@@ -362,16 +418,19 @@ Ngân sách suy ra từ R-S-01, R-S-05, R-S-06 và R-C-12:
   SOLVED  >  ELIMINATED  =  EXPIRED  >  FORFEITED
 ```
 
-  Khi cả hai Player cùng ở `SOLVED`, R-T-05.1 quyết định; khi cùng ở một state
-  không phải `SOLVED`, kết quả là Draw (R-T-05.4).
+  Khi Player và Opponent cùng ở `SOLVED`, R-T-05.1 quyết định; khi cùng ở một
+  terminal label không phải `SOLVED`, kết quả là Draw (R-T-05.4).
 
 - **R-T-05** Match outcome:
-  1. **Cả hai `SOLVED`** → Score cao hơn thắng. Score bằng nhau → **Solve Time
-     sớm hơn** thắng. Bằng nhau cả hai → **Draw**.
-  2. **Đúng một `SOLVED`** → Player đó thắng, không xét Score.
-  3. **Không ai `SOLVED`, đúng một `FORFEITED`** → Player còn lại thắng.
-  4. **Không ai `SOLVED`, còn lại** → **Draw**, bất kể Score và bất kể lý do
-     terminal.
+  1. **Player và Opponent đều `SOLVED`** → so Score của Player với Score của
+     Opponent nếu Opponent là Player, hoặc với Bot Score nếu Opponent là Bot
+     Opponent. Giá trị cao hơn thắng; bằng nhau → **Solve Time sớm hơn** thắng;
+     bằng nhau cả hai → **Draw**.
+  2. **Đúng một phía `SOLVED`** → phía đó thắng, không xét Score hoặc Bot Score.
+  3. **Không phía nào `SOLVED`, đúng một Player `FORFEITED`** → Opponent của
+     Player đó thắng.
+  4. **Không phía nào `SOLVED`, còn lại** → **Draw**, bất kể Score, Bot Score
+     và lý do terminal.
 - **R-T-06** Bỏ cuộc là **hành động chủ động, tường minh**. Nó là **thua**,
   bất kể đối thủ đang ở state nào. Nếu bỏ cuộc chỉ đưa về `ELIMINATED` thì
   người đang thua có thể **ép hoà** bằng cách bỏ cuộc khi đối thủ cũng chưa
@@ -384,10 +443,10 @@ Ngân sách suy ra từ R-S-01, R-S-05, R-S-06 và R-C-12:
   Bỏ cuộc (R-T-06) là đường thoát duy nhất, và nó là thua chứ không phải huỷ.
   Native để `generateRandomPuzzle()` là lệnh huỷ diệt không xác nhận, gọi được
   bất cứ lúc nào bởi bất kỳ client nào.
-- **R-T-11** **Match kết thúc** khi **cả hai** Player đều ở terminal state.
+- **R-T-11** **Match kết thúc** khi Player và Opponent đều terminal.
   Đến lúc đó mới đánh giá R-T-05, mới lộ thông tin theo R-O-02, và mới phát
   `puzzle_id` theo R-P-14. Một Player vào terminal sớm **không** kết thúc Match;
-  đối thủ vẫn chơi tới hết deadline nếu họ muốn.
+  Opponent vẫn chơi tới hết deadline nếu còn active.
 
 Lý do nhánh Draw ở R-T-05.4: xếp hạng bằng Score còn lại sẽ thưởng cho người
 **không mua Clue**, tức thưởng cho việc không chơi.
@@ -396,13 +455,17 @@ Lý do nhánh Draw ở R-T-05.4: xếp hạng bằng Score còn lại sẽ thư�
 
 ## 8. Thông tin đối thủ
 
-- **R-O-01** Trong lúc Match đang chạy, một Player MUST chỉ thấy về đối thủ:
-  **trạng thái kết nối** (online/offline) và Match Clock chung.
-- **R-O-02** Score của đối thủ, số Clue đã mua, Player Board, và **việc đối thủ
-  đã Solve hay chưa** MUST NOT lộ ra trước khi Match kết thúc (R-T-11).
-- **R-O-03** Khi Match kết thúc, cả hai Player MUST thấy: mã bí mật, terminal
-  state của cả hai, Score cuối và Solve Time của cả hai, và Match outcome. Clue
-  nào đối thủ đã mua thuộc phạm vi lịch sử đấu ở
+- **R-O-01** Trong lúc Match đang chạy, một Player MUST thấy Match Clock chung
+  và loại Opponent. Nếu Opponent là Player, Player đó MUST thấy trạng thái kết
+  nối online/offline; nếu Opponent là Bot Opponent, nhãn **Bot** MUST luôn hiện
+  rõ và trạng thái kết nối MUST NOT được dựng giả.
+- **R-O-02** Score hoặc Bot Score của Opponent, số Clue đã mua, Player Board
+  nếu Opponent là Player, Bot State, và **việc Opponent đã Solve hay chưa**
+  MUST NOT lộ ra trước khi Match kết thúc (R-T-11).
+- **R-O-03** Khi Match kết thúc, Player MUST thấy: mã bí mật, terminal state
+  của Player, terminal state hoặc Bot Terminal Status của Opponent, Score cuối,
+  Score hoặc Bot Score cuối của Opponent, các Solve Time có tồn tại, và Match
+  outcome. Clue nào Opponent đã mua thuộc phạm vi lịch sử đấu ở
   [#14](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/14).
 
 Lý do R-O-02: biết đối thủ đã Solve sẽ biến phần còn lại thành đoán liều, mà
@@ -416,13 +479,15 @@ theo R-V-08 đoán liều bị phạt — kết quả khi đó do ai nhận tín
 Mục này đặt **ràng buộc luật chơi** lên threat model; nó không thay thế
 [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12).
 
-- **R-I-01** Server là **authoritative** cho toàn bộ Score, Strike, Clue đã
-  mua, state và đồng hồ.
+- **R-I-01** Server là **authoritative** cho toàn bộ Score, Bot Score, Strike,
+  Clue đã mua, Player State, Bot State, Bot Submission, Bot Terminal Status và
+  đồng hồ.
 - **R-I-02** Mã bí mật MUST NOT rời server trong khi Match còn chạy: không
   trong payload, không trong log, không trong response nào, không suy ra được
   từ đáp án Clue của người khác. Nó chỉ được phát **một lần duy nhất**, trong
   kết quả cuối, sau R-T-11. MUST NOT ghi ra log ở bất kỳ thời điểm nào.
-- **R-I-03** Đáp án Clue MUST chỉ gửi cho **chính Player đã mua**.
+- **R-I-03** Đáp án Clue MUST chỉ được cung cấp cho đúng Player hoặc Bot
+  Opponent đã mua Clue đó.
 - **R-I-04** Mọi id MUST được kiểm bằng **whitelist chính xác**: `T..Y` cho
   LED, đúng bảy cặp cho Q2, `A..S` cho bộ đếm. Id ngoài whitelist → lỗi tường
   minh, không mất Score, không đổi state. Native "validate" bằng so sánh chuỗi
@@ -455,7 +520,8 @@ Mục này đặt **ràng buộc luật chơi** lên threat model; nó không th
 
 - **R-K-03** **Không configurable** — đổi là đổi trò chơi, MUST sửa spec và
   bump minor/major: hình học bàn 2×3, catalogue Clue và semantics của Q1/Q2/Q3,
-  ba ràng buộc sinh mã (R-P-04), và điều kiện kích hoạt Solve (R-V-01).
+  ba ràng buộc sinh mã (R-P-04), và các điều kiện kích hoạt Solve (R-V-01,
+  R-BOT-05).
 - **R-K-04** Hai Match chỉ so sánh được về mặt luật chơi nếu **cùng
   `ruleset_id`**. Spec này không quyết định Elo xử lý ra sao khi ruleset đổi —
   đó là đầu vào cứng cho
@@ -474,7 +540,7 @@ xử lý — không mục nào bị port.
 | --- | --- | --- |
 | 1 | Thắng tự động khi bàn cờ khớp mã | Bỏ. R-V-01, R-V-02 |
 | 2 | Auto-fill không kích hoạt kiểm tra thắng | Không tồn tại. R-C-09 bỏ auto-fill; R-V-01 bỏ auto-detect |
-| 3 | `hold = 2` được VERIFY nhận nhưng auto-detect từ chối | Không tồn tại. R-B-01 chỉ hai trạng thái; chỉ còn một đường Solve |
+| 3 | `hold = 2` được VERIFY nhận nhưng auto-detect từ chối | Không tồn tại. R-B-01 chỉ hai trạng thái; Player chỉ còn một đường Solve |
 | 4 | Thua không xoá mã bí mật (không có terminal) | Bỏ. R-T-02 terminal absorbing |
 | 5 | `pauseGame`/`resumeGame` | Bỏ. R-S-03 |
 | 6 | Kiểm tra thua chỉ chạy trong slot timer | Không tồn tại. R-S-07/09 bỏ hẳn nhánh thua vì hết Score |
@@ -504,17 +570,19 @@ Thuộc ticket khác, MUST tôn trọng luật ở trên:
 
 | Vấn đề | Ticket |
 | --- | --- |
-| Match lifecycle chi tiết, reconnect handshake, concurrency/idempotency | [#4](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) |
+| Match lifecycle chi tiết, reconnect handshake, concurrency/idempotency của đường Room; biến thể cho Matchmaking Queue | [#4](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4), [#31](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/31) |
 | Threat model, anti-cheat, rate limit | [#12](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) |
 | Elo: Draw settlement, provisional, đối thủ lặp lại, correction | [#15](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) |
 | Data model, lịch sử đấu, quyền riêng tư | [#14](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/14) |
 | UX cụ thể của Player Board, Clue và Verify | [#13](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/13) |
 | Repo topology và coexistence với Qt/ESP32 | [#11](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/11) |
+| Hàm hiệu chuẩn Ranked Rating thành Bot Score mục tiêu và hành vi solver | [#30](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/30) |
+| Telemetry tối thiểu để kiểm chứng cân bằng gameplay | [#35](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/35) |
 
 **Đầu vào cứng** mà các ticket đó MUST nhận nguyên trạng: R-P-14 và R-I-02 (mã
 bí mật không rời server tới hết Match), R-S-04 và R-T-07 (đồng hồ không dừng khi
-mất kết nối), R-T-11 (Match kết thúc khi cả hai Player terminal), và R-K-04
-(chỉ Match cùng `ruleset_id` mới so sánh được).
+mất kết nối), R-T-11 và R-BOT-09 (Match kết thúc khi Player và Opponent đều
+terminal), và R-K-04 (chỉ Match cùng `ruleset_id` mới so sánh được).
 
 ---
 
@@ -539,3 +607,11 @@ Mỗi dòng dưới đây kiểm chứng được mà không cần chạy web ap
    này là 16 và 13 — chênh lệch đúng bằng hệ quả của R-S-09.
 10. Mọi hành động làm đổi state sau terminal đều bị từ chối, với cả bốn terminal state.
 11. Verify trên Player Board không giải mã được không làm đổi Score lẫn Strike.
+12. Bot Opponent không có Player Board; chỉ Bot Submission đúng mới đưa nó tới
+    `SOLVED`.
+13. Với mọi Bot State, Bot Score bằng đúng
+    `max(0, 100 - 5 × clue - floor(t/60 giây) - 10 × submission sai)` và không
+    đổi sau `SOLVED`, `ELIMINATED` hoặc `EXPIRED`.
+14. Bot Terminal Status không bao giờ là `FORFEITED`; Match Player-vs-Bot chỉ
+    kết thúc khi Player và Bot Opponent đều terminal, và trước đó Player không
+    nhận bất kỳ Bot State ẩn nào ngoài nhãn Bot.
