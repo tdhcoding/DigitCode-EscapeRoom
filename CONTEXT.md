@@ -28,9 +28,17 @@ _Avoid_: AI, computer, second player, bot player
 The private, evolving board, clues, score, and guesses belonging to one Player in a Match.
 _Avoid_: Match state, shared board
 
+**Bot State**:
+The private, evolving clues, Bot Score, candidate submissions, and Bot Terminal Status belonging to one Bot Opponent in a Match. It never contains a Player Board.
+_Avoid_: Player State, bot board, shared state
+
 **Score**:
-A Player's remaining performance value after clue, elapsed-time, and Wrong Guess costs. Score ranks the two sides when both Solve the Puzzle.
+A Player's remaining performance value after clue, elapsed-time, and Wrong Guess costs. When both sides Solve the Puzzle, it is compared with the Opponent's Score or Bot Score.
 _Avoid_: Points, Elo, rating
+
+**Bot Score**:
+A Bot Opponent's remaining performance value after clue, elapsed-time, and incorrect Bot Submission costs. It is distinct from every Player's Score.
+_Avoid_: Score, bot points, target score
 
 **Ranked Rating**:
 The public number that ranks a Player against every other Player on one scale. It is the only rating a Player can see.
@@ -41,7 +49,7 @@ The system's private estimate of a Player's true strength, informed by every Mat
 _Avoid_: Hidden Elo, MMR, true rating
 
 **Solve**:
-A Player's successful verification of the Puzzle. A Solve finishes that Player's attempt but does not by itself determine the Match winner.
+A successful answer to the Puzzle: a Player produces it through Verify, and a Bot Opponent through Bot Submission. A Solve finishes that side's attempt but does not by itself determine the Match winner.
 _Avoid_: Win, victory
 
 **Wrong Guess**:
@@ -72,6 +80,10 @@ _Avoid_: Question, hint, Q1/Q2/Q3
 The explicit action by which a Player submits their decoded Player Board as an answer. Verify is the only action that can produce a Solve.
 _Avoid_: Check, submit, guess
 
+**Bot Submission**:
+The explicit action by which a Bot Opponent submits one six-digit candidate as its answer.
+_Avoid_: Verify, bot guess, automatic Solve
+
 **Strike**:
 A recorded Wrong Guess against one Player in a Match. The second Strike ends that Player's attempt.
 _Avoid_: Life, attempt, try
@@ -79,6 +91,10 @@ _Avoid_: Life, attempt, try
 **Forfeit**:
 A Player's explicit surrender of a Match. A Forfeit ranks below every other terminal state, so it is a loss whatever the Opponent does.
 _Avoid_: Quit, abandon, resign
+
+**Bot Terminal Status**:
+The terminal label of a Bot Opponent: SOLVED, ELIMINATED, or EXPIRED. A Bot Opponent never has FORFEITED status.
+_Avoid_: Player State, bot result, FORFEITED bot
 
 **Draw**:
 A Match outcome in which neither side is ranked above the other.
@@ -89,7 +105,7 @@ The single wall-clock timer of a Match, running from Match Start. Score decay, t
 _Avoid_: Timer, game clock, play time
 
 **Solve Time**:
-The Match Clock reading, in milliseconds, at which a Player's Solve occurred. It breaks ties between sides that Solve with equal Score.
+The Match Clock reading, in milliseconds, at which a Player's or Bot Opponent's Solve occurred. It breaks a tie after their two Scores, or the Player's Score and the Bot Opponent's Bot Score, are equal.
 _Avoid_: Clear time, elapsed time, duration
 
 **Ruleset**:
