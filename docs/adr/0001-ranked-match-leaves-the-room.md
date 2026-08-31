@@ -6,8 +6,11 @@ their Opponent**, which is sufficient for one person running two accounts to mov
 between them. Because the accepted risk for that was fixed at **zero**, a Ranked Match no
 longer comes from a Room: it comes from the **Matchmaking Queue**, and when no Player is
 available it is played against a **Bot Opponent** whose strength tracks that Player's own
-Ranked Rating — so a rating converges on true strength and stops there, making a climb past
-true strength mathematically impossible rather than merely expensive.
+Ranked Rating through a versioned **Bot Calibration Profile**. The initial profile provides a
+shared, monotone yardstick only over its calibrated domain `500..1500` and clamps outside it;
+it does not prove that rating converges on true strength or that climbing past true strength
+is mathematically impossible. The bounded calibration decision is recorded in
+[#30](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/30).
 
 The full decision, with every number, is the **resolution comment on
 [#25](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/25)**. This document
@@ -38,10 +41,13 @@ only by removing that choice.
   against Bot Opponent moves one rating only. #10 §1.3/§4.1/§4.2/§5.3 must be re-read with
   that in mind.
 - **#10 §4.1 no longer constrains this design.** The disconnected-component problem is solved
-  **structurally**: every Player is measured by the same `Ranked Rating → target Score`
-  function. What makes ratings comparable is a shared **yardstick**, not a shared **node** — a
-  Bot Opponent is not a hub, because it carries no information between two Players.
-- **The integrity of the whole ladder now rests on that calibration function**, and the
-  function does not exist yet. Wherever it is not monotone, that band of the ladder is wrong
-  **silently**, with no symptom.
+  **structurally within the calibrated domain**: every Player is measured by the same
+  versioned `Ranked Rating → target Bot Score` function. What makes ratings comparable there is a
+  shared **yardstick**, not a shared **node** — a Bot Opponent is not a hub, because it carries
+  no information between two Players.
+- **The integrity of the calibrated part of the ladder rests on that profile.** The initial
+  profile and its offline/live validation contract are recorded in
+  [#30](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/30); rating policy must supply
+  cap or equivalent saturation semantics and must not present Ratings outside `500..1500` as
+  calibrated.
 - **Parts of #2 and #4 are void** — the exact list lives in the resolution comment on #25.

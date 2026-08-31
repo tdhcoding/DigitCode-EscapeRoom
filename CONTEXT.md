@@ -24,6 +24,10 @@ _Avoid_: Rival, enemy, the other player
 A program that takes one side of a Match in place of a Player. It holds no identity and carries no Ranked Rating, and is never presented as a Player.
 _Avoid_: AI, computer, second player, bot player
 
+**Bot Calibration Profile**:
+An immutable, versioned contract that maps a pre-Match Ranked Rating snapshot to Bot Opponent inference and pacing behavior under exactly one Ruleset.
+_Avoid_: Bot difficulty, calibration config, rating formula
+
 **Player State**:
 The private, evolving board, clues, score, and guesses belonging to one Player in a Match.
 _Avoid_: Match state, shared board
