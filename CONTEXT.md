@@ -120,6 +120,10 @@ _Avoid_: Config, settings, rules
 The one place a Player waits to be given an Opponent for a Ranked Match. No Player chooses who they are matched with.
 _Avoid_: Lobby, matchmaking, pool, ladder
 
+**Queue Entry**:
+A Player's revocable consent to receive the first eligible Opponent assigned by the Matchmaking Queue for one Ranked Match. It ends when consumed, cancelled, or expired.
+_Avoid_: Lobby slot, challenge, opponent request, ready state
+
 **Room**:
 The durable meeting place a Room Owner opens to invite one other Player into Practice Matches. A Room outlives the Matches played in it, and no Ranked Match is ever played in one.
 _Avoid_: Lobby, session, game, match
