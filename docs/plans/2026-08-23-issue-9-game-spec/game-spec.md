@@ -456,9 +456,13 @@ Lý do nhánh Draw ở R-T-05.4: xếp hạng bằng Score còn lại sẽ thư�
 ## 8. Thông tin đối thủ
 
 - **R-O-01** Trong lúc Match đang chạy, một Player MUST thấy Match Clock chung
-  và loại Opponent. Nếu Opponent là Player, Player đó MUST thấy trạng thái kết
-  nối online/offline; nếu Opponent là Bot Opponent, nhãn **Bot** MUST luôn hiện
-  rõ và trạng thái kết nối MUST NOT được dựng giả.
+  và loại Opponent. Nếu Opponent là Player, Player đó MUST thấy trạng thái
+  **hoạt động gần đây** suy ra từ command/snapshot, không phải cam kết
+  online/offline; nếu Opponent là Bot Opponent, nhãn **Bot** MUST luôn hiện rõ
+  và trạng thái kết nối MUST NOT được dựng giả. Semantic hoạt động gần đây do
+  [Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4#issuecomment-5388852395)
+  chốt và áp dụng cho đường Matchmaking Queue tại
+  [Chốt Match lifecycle cho đường Matchmaking Queue](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/31).
 - **R-O-02** Score hoặc Bot Score của Opponent, số Clue đã mua, Player Board
   nếu Opponent là Player, Bot State, và **việc Opponent đã Solve hay chưa**
   MUST NOT lộ ra trước khi Match kết thúc (R-T-11).
