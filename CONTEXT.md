@@ -8,6 +8,18 @@ DigitCode is a competitive deduction game in which players spend points on clues
 A person who participates in a Match, whether or not they have signed up. A Bot Opponent is never a Player.
 _Avoid_: User, competitor, guest
 
+**Player Identity**:
+A durable identity under which the system associates a Player with their Ranked Rating, Skill Estimate, and Match history. It is independent of any browser session, device, connection, or sign-in method.
+_Avoid_: Account, user, session, provider identity
+
+**Linked Identity**:
+A Google or email identity that a Player has attached to a Player Identity and can use to authenticate access to it.
+_Avoid_: Provider, login, recovery code
+
+**Self-recovery**:
+Regaining access to the same Player Identity by authenticating with an accessible Linked Identity, without operator intervention, manual identity proof, Player Identity merging, or database restoration.
+_Avoid_: Account recovery, restore, merge
+
 **Puzzle**:
 A secret six-digit code together with the clue facts derived from it. Both sides of a Match receive the same Puzzle.
 _Avoid_: Question, board, level
