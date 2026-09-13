@@ -85,11 +85,11 @@ A valid six-digit code submitted by a Player that does not match the Puzzle. An 
 _Avoid_: Invalid submission, failed verification
 
 **Ranked Match**:
-A Match whose final result changes the Ranked Rating of every Player in it. Every Ranked Match begins in the Matchmaking Queue.
+A Match whose final result always produces a Rating Settlement for every Player in it, though the resulting change may be zero. Every Ranked Match begins in the Matchmaking Queue.
 _Avoid_: Competitive game, rated room
 
 **Practice Match**:
-A Match that follows the same game rules as a Ranked Match, except that it draws its Puzzle from the unrestricted pool, and that it moves no one's Ranked Rating. It still informs the Skill Estimate of each Player in it.
+A Match that follows the same game rules as a Ranked Match, except that it draws its Puzzle from the unrestricted pool, and that it moves no one's Ranked Rating. It informs a Player's Skill Estimate only when that Player's Opponent is a Bot Opponent.
 _Avoid_: Casual game, friendly room
 
 **Production MVP**:
