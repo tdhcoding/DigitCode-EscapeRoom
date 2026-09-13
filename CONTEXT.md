@@ -85,7 +85,7 @@ A valid six-digit code submitted by a Player that does not match the Puzzle. An 
 _Avoid_: Invalid submission, failed verification
 
 **Ranked Match**:
-A Match whose final result always produces a Rating Settlement for every Player in it, though the resulting change may be zero. Every Ranked Match begins in the Matchmaking Queue.
+A Match whose final result always produces exactly one Rating Settlement, covering every Player in it, though a Player's resulting change may be zero. Every Ranked Match begins in the Matchmaking Queue.
 _Avoid_: Competitive game, rated room
 
 **Practice Match**:
