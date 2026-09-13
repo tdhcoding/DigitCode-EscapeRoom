@@ -57,12 +57,24 @@ A Bot Opponent's remaining performance value after clue, elapsed-time, and incor
 _Avoid_: Score, bot points, target score
 
 **Ranked Rating**:
-The public number that ranks a Player against every other Player on one scale. It is the only rating a Player can see.
+The public number that ranks a Player against every other Player on one scale, within one Rating Generation. It is the only rating a Player can see.
 _Avoid_: Elo, MMR, rank
 
 **Skill Estimate**:
-The system's private estimate of a Player's true strength, informed by every Match they play. It is never shown to a Player.
+The system's private measurement of a Player's strength, taken before they are eligible for Ranked Match and used once to set their opening Ranked Rating. Only a Practice Match against a Bot Opponent informs it, and it stops moving once it has been used, until a new Rating Generation begins. It is never shown to a Player.
 _Avoid_: Hidden Elo, MMR, true rating
+
+**Rating Generation**:
+The Ruleset, Bot Calibration Profile, and rating arithmetic under which a Ranked Rating was measured. Two Ranked Ratings from different Rating Generations are not comparable.
+_Avoid_: Season, rating reset, ruleset version
+
+**Rating Settlement**:
+The single act that turns a finished Ranked Match into a Ranked Rating change. It happens at most once per Match, and never for a Practice Match.
+_Avoid_: Rating update, payout, finalization
+
+**Rating Ledger**:
+The permanent record of every Rating Settlement and every correction to one. Nothing already recorded is ever rewritten, and a Ranked Rating can be rebuilt from it.
+_Avoid_: Rating history, audit log, Match history
 
 **Solve**:
 A successful answer to the Puzzle: a Player produces it through Verify, and a Bot Opponent through Bot Submission. A Solve finishes that side's attempt but does not by itself determine the Match winner.
