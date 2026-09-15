@@ -96,6 +96,10 @@ _Avoid_: Casual game, friendly room
 The first publicly deployable web release with sign-in, online Matches, reconnect-safe results, Match history, and Ranked Ratings.
 _Avoid_: Prototype, demo
 
+**Live Beta**:
+The single operating posture under which Production MVP is published: zero recurring cost, no availability commitment, and no revenue of any kind. It constrains what may be claimed publicly, never what the system guarantees.
+_Avoid_: Production release, GA, early access, soft launch
+
 **Player Board**:
 The 2x3 grid of seven-segment LEDs that one Player draws on during a Match. Each of its 42 LED-segment cells is either off or on. Only that Player writes to it; a Clue never does.
 _Avoid_: Board, grid, canvas
