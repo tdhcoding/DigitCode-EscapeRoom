@@ -84,7 +84,7 @@ Mỗi Telemetry Fact MUST mang đúng 20 trường sau, không hơn.
 | 16 | `strike_count` | `0` \| `1` \| `2` | R-V-07 đến R-V-09 |
 | 17 | `pre_match_rating_snapshot` | số nguyên \| `null` | `null` khi `mode = PRACTICE` hoặc `subject_kind = BOT` |
 | 18 | `rating_domain_flag` | `IN_DOMAIN` \| `BELOW_DOMAIN` \| `ABOVE_DOMAIN` \| `null` | `null` khi không có snapshot; §8 |
-| 19 | `puzzle_pool` | `RANKED_RESTRICTED` \| `UNRESTRICTED` | 464.948 lớp so với 465.120 secret |
+| 19 | `puzzle_pool` | `RANKED_RESTRICTED` \| `UNRESTRICTED` | 464.948 mã (R-P-10) so với 465.120 mã (R-P-09) |
 | 20 | `puzzle_difficulty_class` | nhãn hữu hạn | §7 |
 
 `outcome` MUST được dẫn xuất theo đúng ma trận của
@@ -105,7 +105,7 @@ Telemetry Fact MUST NOT chứa, dưới bất kỳ dạng nào kể cả đã b�
 
 1. Mã bí mật của Puzzle (R-I-02, R-P-14).
 2. Đáp án Clue hoặc nội dung Clue đã mua (R-I-03, R-C-15).
-3. Player Board, kể cả một phần, kể cả ở dạng dẫn xuất (R-B-03).
+3. Player Board, kể cả một phần, kể cả ở dạng dẫn xuất (R-B-01, R-B-06).
 4. Ghi chú nháp của Player (R-B-03 đã loại nó khỏi Player State).
 5. `puzzle_id`, kể cả dạng mờ.
 6. `match_id`, hoặc bất kỳ khoá nào ghép được hai fact của cùng một Match, hoặc
@@ -119,7 +119,10 @@ Telemetry Fact MUST NOT chứa, dưới bất kỳ dạng nào kể cả đã b�
     (`CONTEXT.md`: "It is never shown to a Player") và không cần cho mục tiêu nào
     ở §1.
 12. Raw command payload.
-13. Giờ, phút, giây — xem §6.
+13. Access token, refresh token, cookie, magic-link hoặc auth code — đã bị
+    [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12)
+    cấm khỏi operational log, và không trường nào ở §3 mang được chúng.
+14. Giờ, phút, giây — xem §6.
 
 Điểm 6 là cái làm ranh giới §1 thành cấu trúc. Hệ quả được chấp nhận có ý thức:
 hai fact của cùng một Match không bao giờ nối lại được, nên không thể dựng lại
@@ -192,13 +195,24 @@ Hai đặc trưng đã bị loại, có lý do:
   [`findings.md`](../2026-08-24-clue-bounds/findings.md) nói rõ đóng nó cần một
   cây quyết định tối ưu chưa ai dựng. Một đặc trưng chưa tính được không thể là
   trường bắt buộc.
-- **Trọng số sampler.** Không dùng vì không liên quan: issue 6 đo được sampler
-  lệch 9/7 nhưng **độ khó thì không lệch**. Đưa nó vào class là phân lớp theo một
-  trục đã được chứng minh là không mang thông tin độ khó.
+- **Trọng số sampler.** Không dùng vì không liên quan:
+  [Định lượng độ công bằng và khả năng giải của Puzzle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/6)
+  đo được sampler lệch 9/7 nhưng **độ khó thì không lệch**. Đưa nó vào class là
+  phân lớp theo một trục đã được chứng minh là không mang thông tin độ khó.
 
 Độ khó thực tế không nằm ở class — nó được đo **hậu nghiệm** từ chính các trường
 12–16 gộp theo class. Class chỉ tồn tại để tách nhóm bệnh lý ra khỏi phần còn
 lại. Mở rộng taxonomy MUST tạo contract version mới, không sửa tại chỗ.
+
+**Hệ quả phải nói trước: trên pool Ranked, class là hằng số.** Nhãn dương của
+`symmetric_family` đúng bằng 172 mã mà R-P-10 đã loại khỏi pool Ranked, nên mọi
+fact có `puzzle_pool = RANKED_RESTRICTED` đều mang cùng một nhãn. Đó không phải
+khuyết tật — nhóm bệnh lý đã bị loại khỏi Ranked bằng luật, nên không còn gì để
+phân biệt ở đó; class chỉ biến thiên trong Practice, nơi nhãn dương có tần suất
+kỳ vọng `172 / 465.120`, tức khoảng 0,037%. Vì vậy `puzzle_difficulty_class`
+MUST NOT được dùng như trục phân tích độ khó của Ranked; ở Ranked, độ khó đọc từ
+các trường 12–16 gộp theo band. Một taxonomy có sức phân biệt trên pool Ranked
+là việc của contract version sau, và nó cần một đặc trưng chưa tính được hôm nay.
 
 Rò rỉ secret không xảy ra qua đường này: fact chỉ tồn tại **sau** khi Match
 finalized, thời điểm mà R-O-03 đã công bố secret cho chính hai phía, và fact
@@ -260,8 +274,8 @@ Artifact này MUST NOT loại quan sát ngoài miền khỏi band, MUST NOT đ�
 band, và MUST NOT đổi status — cả ba đều là tài sản của issue 30, vốn đã chốt
 "không auto-tune profile đã publish; correction phải tạo profile version mới qua
 review". Câu hỏi thật mà việc báo này phơi ra — status của một band biên có được
-phép kích hoạt profile version mới hay không — được graduate thành ticket riêng,
-xem §12.
+phép kích hoạt profile version mới hay không — được graduate thành
+[Chốt phản ứng khi band biên của live balance validation rơi vào OUT_OF_TOLERANCE](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/45).
 
 ## 9. Retention: một bất biến, không phải một con số
 
@@ -279,8 +293,11 @@ Generation. Một thoả thuận retention ngắn bình thường sẽ khiến c
 không bao giờ tích đủ, và `VALIDATED` thành điều kiện bất khả thi vĩnh viễn — đúng
 loại bẫy mà [Chốt launch posture cho zero-cost MVP](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/17)
 §5 đã phải gỡ một lần khi bác điều kiện "ít nhất một band `VALIDATED` trước Open
-Beta". Bất biến neo vào Generation chứ không vào thời gian, nên nó không chặn
-lựa chọn nào của chủ schema.
+Beta". Bất biến này **có** thu hẹp không gian lựa chọn của chủ schema, và thu hẹp
+có chủ ý: nó loại mọi thoả thuận xoá hay tổng hợp mất mát chạm vào fact của
+Generation đang sống, kể cả một chu kỳ quét đồng nhất kiểu 30 ngày. Cái nó không
+làm là ấn định một con số — sàn neo vào vòng đời của Generation, nên chủ schema
+vẫn chọn tự do thời hạn, thứ tự xoá và hình dạng lưu trữ cho mọi thứ còn lại.
 
 ## 10. Telemetry không nối vào bất kỳ đường ra quyết định tự động nào
 
@@ -331,7 +348,7 @@ Một implementation tuân thủ `digitcode-balance-telemetry/1.0.0` MUST thoả
 | Observability, alerting, quota monitoring, release criteria | [Chốt quality gate, zero-cost operations và release criteria](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/16) |
 | Presentation và câu chữ hiển thị cho Player | [Prototype trải nghiệm web end-to-end](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/13) |
 | Transaction, transport và index implementation | [Chọn kiến trúc web và managed services](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/3) |
-| Phản ứng với status của band biên | ticket được graduate từ §8 |
+| Phản ứng với status của band biên | [Chốt phản ứng khi band biên của live balance validation rơi vào OUT_OF_TOLERANCE](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/45) |
 | Production implementation | ngoài phạm vi map |
 
 ## 13. Canonical sources
