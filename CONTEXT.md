@@ -76,6 +76,10 @@ _Avoid_: Rating update, payout, finalization
 The permanent record of every Rating Settlement and every correction to one. Nothing already recorded is ever rewritten, and a Ranked Rating can be rebuilt from it.
 _Avoid_: Rating history, audit log, Match history
 
+**Balance Telemetry**:
+The non-identifying record kept for one purpose only: checking that the Ruleset and Bot Opponent calibration behave as decided. It is not Match history, not anti-cheat evidence, not product analytics, and not vendor-quota monitoring.
+_Avoid_: Analytics, metrics, logging, Match history
+
 **Solve**:
 A successful answer to the Puzzle: a Player produces it through Verify, and a Bot Opponent through Bot Submission. A Solve finishes that side's attempt but does not by itself determine the Match winner.
 _Avoid_: Win, victory
