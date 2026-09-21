@@ -24,7 +24,7 @@ Bốn thứ nó MUST NOT bị trộn vào, và lý do mỗi thứ đã có chủ
 | --- | --- | --- |
 | Match history | Phục vụ Player đọc lại trận của chính mình; định danh, có quyền đọc, có nghĩa vụ xoá | [Chốt data model, lịch sử đấu và quyền riêng tư](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/14) |
 | Anti-cheat evidence | Phục vụ case có người review; tập dữ liệu và retention riêng (90 ngày sau Match / 30 ngày sau khi case đóng) | [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) |
-| Product analytics | Đo hành vi sản phẩm, không đo luật chơi | không thuộc destination của map |
+| Product analytics | Đo hành vi sản phẩm, không đo luật chơi | chưa ticket nào trên map nhận, và map cũng chưa xếp nó vào Out of scope |
 | Vendor-quota monitoring | Đo mức tiêu thụ hạ tầng để giữ chi phí bằng 0 | [Chốt quality gate, zero-cost operations và release criteria](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/16) |
 
 Ranh giới này được giữ bằng **cấu trúc**, không bằng kỷ luật người dùng: §4 cắt
@@ -49,7 +49,7 @@ Match đã finalized.
 
 **Vì sao không derive từ Match history.** Ticket này đang **chặn**
 [Chốt data model, lịch sử đấu và quyền riêng tư](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/14).
-Một thiết kế đọc schema của issue 14 sẽ làm blocker phụ thuộc vào thứ nó chặn,
+Một thiết kế đọc schema của ticket đó sẽ làm blocker phụ thuộc vào thứ nó chặn,
 và hợp nhất telemetry với đúng tập dữ liệu mà §1 tách ra.
 
 **Vì sao không phải event stream trong lúc chơi.** Mọi invocation đều tính vào
@@ -105,7 +105,10 @@ Telemetry Fact MUST NOT chứa, dưới bất kỳ dạng nào kể cả đã b�
 
 1. Mã bí mật của Puzzle (R-I-02, R-P-14).
 2. Đáp án Clue hoặc nội dung Clue đã mua (R-I-03, R-C-15).
-3. Player Board, kể cả một phần, kể cả ở dạng dẫn xuất (R-B-01, R-B-06).
+3. Player Board, kể cả một phần, kể cả ở dạng dẫn xuất — R-O-02 giữ nó kín với
+   Opponent, nó là một phần của Player State mà
+   [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12)
+   đã cấm khỏi operational log, và nội dung replay thuộc anti-cheat evidence.
 4. Ghi chú nháp của Player (R-B-03 đã loại nó khỏi Player State).
 5. `puzzle_id`, kể cả dạng mờ.
 6. `match_id`, hoặc bất kỳ khoá nào ghép được hai fact của cùng một Match, hoặc
@@ -176,7 +179,8 @@ nhãn hữu hạn, thoả ba bất biến:
 
 1. tính được offline từ luật sampler, không cần biết secret của một Match cụ thể;
 2. không mang `puzzle_id` và không cho phép suy ra nó;
-3. mỗi nhãn MUST chứa ít nhất **172** secret.
+3. mỗi nhãn MUST chứa ít nhất **172** mã khi tính trên pool không hạn chế
+   465.120 mã (R-P-09).
 
 Ở `digitcode-balance-telemetry/1.0.0`, class dùng đúng **một** đặc trưng:
 
@@ -260,7 +264,8 @@ decisive share = Player wins / (Player wins + Bot Opponent wins)
 ```
 
 Draw MUST báo riêng, không nằm trong mẫu số. Status MUST theo đúng ba nhãn của
-issue 30 §9 — `VALIDATED` khi toàn Wilson 95% interval hai phía nằm trong
+[Chốt hàm hiệu chuẩn Ranked Rating thành Score mục tiêu](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/30)
+§9 — `VALIDATED` khi toàn Wilson 95% interval hai phía nằm trong
 `40%..60%`; `OUT_OF_TOLERANCE` khi toàn interval nằm dưới 40% hoặc trên 60%;
 `INSUFFICIENT_EVIDENCE` khi chưa có decisive Match và trong mọi trường hợp còn
 lại. Artifact này MUST NOT sửa ngưỡng, nhãn, hay mốc 94 decisive Match.
@@ -271,9 +276,11 @@ ngoài miền vào quan sát trong miền. Aggregate của band 500 và band 150
 kèm `out_of_domain_count`, đếm từ `rating_domain_flag`.
 
 Artifact này MUST NOT loại quan sát ngoài miền khỏi band, MUST NOT đổi định nghĩa
-band, và MUST NOT đổi status — cả ba đều là tài sản của issue 30, vốn đã chốt
-"không auto-tune profile đã publish; correction phải tạo profile version mới qua
-review". Câu hỏi thật mà việc báo này phơi ra — status của một band biên có được
+band, và MUST NOT đổi status — cả ba đều là tài sản của
+[Chốt hàm hiệu chuẩn Ranked Rating thành Score mục tiêu](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/30),
+vốn đã chốt "không auto-tune profile đã publish; correction phải tạo profile
+version mới qua review".
+Câu hỏi thật mà việc báo này phơi ra — status của một band biên có được
 phép kích hoạt profile version mới hay không — được graduate thành
 [Chốt phản ứng khi band biên của live balance validation rơi vào OUT_OF_TOLERANCE](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/45).
 
@@ -309,8 +316,9 @@ vẫn chọn tự do thời hạn, thứ tự xoá và hình dạng lưu trữ c
 - Không cơ chế nào được tự động đổi profile dựa trên status. Chuỗi phản ứng đã
   chốt là: người đọc aggregate → review → profile version mới.
 
-Điều kiện thứ hai và thứ ba là cách giữ "không auto-tune" của issue 30 §9 bằng
-ràng buộc chứ không bằng thiện chí. Điều kiện thứ nhất giữ cho
+Điều kiện thứ hai và thứ ba là cách giữ "không auto-tune" của
+[Chốt hàm hiệu chuẩn Ranked Rating thành Score mục tiêu](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/30)
+§9 bằng ràng buộc chứ không bằng thiện chí. Điều kiện thứ nhất giữ cho
 [Chốt launch posture cho zero-cost MVP](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/17)
 §7.2 tuyên bố B8 — cấm nói Bot Opponent được chứng minh cân bằng — không thể bị
 vi phạm qua đường telemetry. Nếu sau này muốn hiển thị bất cứ thứ gì ra Player,
@@ -328,7 +336,9 @@ Một implementation tuân thủ `digitcode-balance-telemetry/1.0.0` MUST thoả
    security log.
 4. `observed_on` không mang thông tin nhỏ hơn một ngày.
 5. `subject_pseudonym` của cùng một Player khác nhau giữa hai Rating Generation.
-6. Mọi nhãn của `puzzle_difficulty_class` chứa ít nhất 172 secret.
+6. Mọi nhãn của `puzzle_difficulty_class` chứa ít nhất 172 mã khi tính trên pool
+   không hạn chế 465.120 mã; trên pool Ranked nhãn dương rỗng, theo đúng hệ quả
+   nêu ở §7.
 7. Status của một band tính lại từ tập fact luôn cho cùng kết quả, không phụ
    thuộc thời điểm chạy hay sự tồn tại của một job.
 8. Không cặp `(ruleset_id, profile_id)` nào bị gộp chung khi tính status.
@@ -358,8 +368,9 @@ Một implementation tuân thủ `digitcode-balance-telemetry/1.0.0` MUST thoả
   Calibration Profile**, **Skill Estimate**, **Score**, **Bot Score**, **Solve
   Time**, **Ruleset**.
 - [`game-spec.md`](../2026-08-23-issue-9-game-spec/game-spec.md): R-I-02, R-I-03,
-  R-P-14, R-B-03, R-C-15, R-V-07 đến R-V-09, R-BOT-07, R-O-03 — bí mật, đáp án
-  Clue, ghi chú nháp, Strike, terminal status, công bố sau Match.
+  R-P-09, R-P-10, R-P-14, R-B-03, R-C-15, R-V-07 đến R-V-09, R-BOT-07, R-O-02,
+  R-O-03 — bí mật, đáp án Clue, hai pool Puzzle, ghi chú nháp, Strike, terminal
+  status, bí mật đối ứng trong Match, công bố sau Match.
 - [`bot-calibration-profile.md`](../2026-08-31-issue-30-bot-calibration/bot-calibration-profile.md)
   §9: decisive share, 11 band, ba validation status, mốc 94 decisive Match, và
   việc giao event/storage/privacy/production aggregation cho ticket này.
