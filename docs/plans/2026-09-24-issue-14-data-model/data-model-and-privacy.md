@@ -85,7 +85,7 @@ nên timeline và state của nó không thể hết hạn trước khi kết qu
 
 | Entity | Nội dung chính | Hết hạn |
 | --- | --- | --- |
-| Player Identity | `player_id`, `created_at`, thuộc tính bền "đã từng link Google" (issue 15 §6), display name, lịch sử tên, Player Tag, `tombstoned_at` | Vĩnh viễn; PII bị xoá ở tombstone (§8) |
+| Player Identity | `player_id`, `created_at`, thuộc tính bền "đã từng link Google" ([Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §6), display name, lịch sử tên, Player Tag, `tombstoned_at` | Vĩnh viễn; PII bị xoá ở tombstone (§8) |
 | Linked Identity | Provider link, email | Nằm ở auth của vendor; xoá ở tombstone |
 | Room | Owner, mode, trạng thái, mốc thời gian | Vĩnh viễn |
 | Invite Code registry | Mọi mã từng phát, kèm Room | Vĩnh viễn |
@@ -94,24 +94,24 @@ nên timeline và state của nó không thể hết hạn trước khi kết qu
 | Puzzle secret | Secret và seed lịch bot (§4) | 90 ngày sau finalization |
 | Player State, Bot State | State hiện hành, `version`, mốc hoạt động gần đây | 90 ngày sau finalization |
 | Match Timeline event | §2 | 90 ngày sau finalization |
-| Command dedup | `command_id`, response đã trả | 24 giờ sau terminal (issue 12) |
+| Command dedup | `command_id`, response đã trả | 24 giờ sau terminal ([Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12)) |
 | Ranked Rating | Theo cặp (Player Identity, Rating Generation) | Vĩnh viễn |
-| Rating Ledger event | Sáu nhóm trường của issue 15 §11 | Vĩnh viễn |
+| Rating Ledger event | Sáu nhóm trường của [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §11 | Vĩnh viễn |
 | Skill Estimate log | §9 | Vĩnh viễn |
-| Telemetry Fact | 20 trường của issue 35 §3 | Sàn issue 35 §9, rồi 90 ngày sau khi Generation hết hiện hành |
+| Telemetry Fact | 20 trường của [Chốt telemetry tối thiểu để kiểm chứng cân bằng gameplay](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/35) §3 | Sàn [Chốt telemetry tối thiểu để kiểm chứng cân bằng gameplay](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/35) §9, rồi 90 ngày sau khi Generation hết hiện hành |
 | Case file | §6 | Muộn hơn giữa 90 ngày và 30 ngày (§6) |
 | Enforcement record | §6 | Chừng nào Player Identity còn tồn tại |
-| Security log | Issue 12 | 30 ngày |
+| Security log | [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) | 30 ngày |
 
 **Mốc hoạt động gần đây** là một trường của Player State, được command và
 snapshot cập nhật. Nó hết hạn cùng Player State và MUST NOT trở thành log truy
 cập. MVP không có bảng session riêng: refresh token, rotation và logout-all do
-auth của vendor giữ. Nơi duy nhất ghi sự kiện auth là security log của issue 12.
+auth của vendor giữ. Nơi duy nhất ghi sự kiện auth là security log của [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12).
 
-**Invite Code registry** giữ vĩnh viễn để luật "không bao giờ tái dùng" của issue 2
+**Invite Code registry** giữ vĩnh viễn để luật "không bao giờ tái dùng" của [Chốt identity, profile và invite-room lifecycle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/2)
 là một constraint, không phải một kiểm tra trong code. Mã đã chết không mở được gì
 nên không còn là bí mật. Hash cũng vô ích, vì không gian 10⁹ brute-force được
-ngay. Khi mã còn sống, mọi rào của issue 12 vẫn áp dụng: không có trong URL, log,
+ngay. Khi mã còn sống, mọi rào của [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) vẫn áp dụng: không có trong URL, log,
 analytics hay referrer.
 
 **Rating Generation cũ** MUST được lưu kèm nhãn Generation. Không xoá, không mang
@@ -129,7 +129,7 @@ R-P-14 giao hình dạng bản ghi Puzzle cho ticket này.
   trên Match record, vì publishable key là public và ai cũng gọi thẳng Data API
   được.
 - Finalization MUST chép secret vào Match record trong chính transaction đó. "Lộ
-  secret" và "kết quả tồn tại" vì vậy là cùng một sự kiện, đúng lý do issue 4 gộp
+  secret" và "kết quả tồn tại" vì vậy là cùng một sự kiện, đúng lý do [Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) gộp
   finalization vào một transaction: R-I-02 cho phép phát secret đúng một lần, sau
   R-T-11.
 - `puzzle_id` MUST là một giá trị ngẫu nhiên, không phải chỉ số của mã trong pool,
@@ -139,13 +139,13 @@ R-P-14 giao hình dạng bản ghi Puzzle cho ticket này.
   NOT lưu bản lịch tính sẵn. Biết lịch là biết bot sắp Solve lúc nào, điều mà
   R-O-02 và R-BOT-10 cấm. Khi đã có secret và seed, toàn bộ lịch tính lại được,
   nên audit không cần bản tính sẵn.
-- Break-glass access vào entity này MUST có lý do và có audit (issue 12).
+- Break-glass access vào entity này MUST có lý do và có audit ([Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12)).
 
 ## 5. Retention: hai tầng, và cái gì được hy sinh
 
 Không cơ chế zero-cost nào được vendor bảo đảm đủ để một hành vi phụ thuộc vào nó
 ([Nghiên cứu cơ chế scheduled job zero-cost cho Vercel Hobby + Supabase Free](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/27)).
-Retention vì vậy dùng đúng mẫu mà issue 4 và issue 31 dùng cho `EXPIRED`:
+Retention vì vậy dùng đúng mẫu mà [Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) và [Chốt Match lifecycle cho đường Matchmaking Queue](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/31) dùng cho `EXPIRED`:
 correctness nằm trên đường đọc, sweep chỉ là tối ưu.
 
 1. **Hết hạn truy cập là bảo đảm cứng.** Mỗi hàng có hạn MUST mang mốc hết hạn
@@ -160,7 +160,7 @@ correctness nằm trên đường đọc, sweep chỉ là tối ưu.
 **Áp lực quota.** Các lớp vĩnh viễn chỉ tăng mà không giảm, trong khi Postgres của
 Supabase Free có 500 MB mỗi project. Khi áp lực quota buộc phải chọn:
 
-- Match Timeline (kéo theo state trong Match) là lớp **duy nhất** operator được
+- Match Timeline là lớp **duy nhất** operator được
   rút ngắn dưới 90 ngày. Việc rút MUST là một quyết định có ghi lại, MUST NOT tự
   động, và MUST NOT chạm Match nào mà một case file còn mở đang trỏ tới.
 - Match record, Rating Ledger, Skill Estimate log, enforcement record và Telemetry
@@ -174,10 +174,10 @@ tuyên bố bị cấm B4 của
 
 ## 6. Anti-cheat evidence: case file và enforcement record
 
-Tập dữ liệu anti-cheat của issue 12 (pair, outcome, duration, Forfeit, account age)
+Tập dữ liệu anti-cheat của [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) (pair, outcome, duration, Forfeit, account age)
 đều nằm sẵn trên Match record, Rating Ledger và Player Identity, tức là trên các
-lớp vĩnh viễn mà issue 2 và issue 15 đã chốt. Nếu hiểu "anti-cheat evidence" là
-chính các dữ liệu đó, mốc 90/30 của issue 12 hoặc vô nghĩa, hoặc đụng hai quyết định
+lớp vĩnh viễn mà [Chốt identity, profile và invite-room lifecycle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/2) và [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) đã chốt. Nếu hiểu "anti-cheat evidence" là
+chính các dữ liệu đó, mốc 90/30 của [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) hoặc vô nghĩa, hoặc đụng hai quyết định
 đã đóng. Artifact này đọc nó như sau:
 
 - **Case file** là evidence. Nó gồm flag, tham chiếu tới các `match_id` liên quan
@@ -189,48 +189,50 @@ chính các dữ liệu đó, mốc 90/30 của issue 12 hoặc vô nghĩa, ho�
   appeal. Nó MUST append-only; appeal thành công là một record mới. Nó MUST NOT
   chứa PII, dữ liệu Match hay ghi chú reviewer. Nó sống chừng nào Player Identity
   còn tồn tại, kể cả sau tombstone, vì nấc 7 ngày → 30 ngày → vô thời hạn của
-  issue 12 cần biết đây là vi phạm thứ mấy.
+  [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) cần biết đây là vi phạm thứ mấy.
 
-Cách đọc này không nới tập dữ liệu của issue 12, không thêm IP hay fingerprint,
-và không sửa issue 2 hay issue 15.
+Cách đọc này không nới tập dữ liệu của [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12), không thêm IP hay fingerprint,
+và không sửa [Chốt identity, profile và invite-room lifecycle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/2) hay [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15).
 
 **Signal collusion.** Các signal mà
 [Chốt mô hình đối thủ của Ranked Match](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/25)
 yêu cầu giữ (tỷ trọng Match theo cặp, chuỗi outcome một chiều, duration bất thường,
 tỷ lệ Forfeit/timeout, account age, opponent diversity, graph donor→recipient) đều
 suy ra được từ lớp vĩnh viễn. MUST NOT có kho signal riêng hay bản materialize:
-signal được tính khi đọc. Ticket này chỉ bảo đảm bốn thứ tồn tại vĩnh viễn: cặp
+signal được tính khi đọc. Ticket này chỉ bảo đảm năm thứ tồn tại vĩnh viễn: cặp
 Player của Match, outcome, terminal state (kể cả `FORFEITED`), `started_at` cùng
 thời điểm finalization, và `created_at` của Player Identity. `created_at` không
 phải PII và sống qua tombstone.
 
 ## 7. Ai được đọc gì
 
-Không ai ngoài những người tham gia đọc được bất cứ thứ gì về một Match. Public
-profile, spectator, leaderboard và admin dashboard đều nằm ngoài phạm vi của map.
+Không Player nào ngoài những người tham gia đọc được bất cứ thứ gì về một Match;
+quyền của operator được chỉ định nằm ở cột cuối của bảng. Public profile,
+spectator, leaderboard và admin dashboard đều nằm ngoài phạm vi của map.
 
 | Dữ liệu | Player tham gia | Player khác | Operator được chỉ định |
 | --- | --- | --- | --- |
 | State trong Match của chính mình | Trong lúc chơi | Không | Break-glass có audit |
 | State trong Match của Opponent | Không trước R-T-11 (R-O-02, R-BOT-10) | Không | Break-glass có audit |
 | Match record | Sau R-T-11 | Không | Có |
-| Match Timeline, cả hai phía | Sau R-T-11, tới khi hết hạn | Không | Có, qua case file |
-| Puzzle secret, seed | Chỉ qua Match record, sau R-T-11 | Không | Break-glass có audit |
+| Match Timeline, cả hai phía | Sau R-T-11, tới khi hết hạn | Không | Qua case file, hoặc break-glass có audit |
+| Puzzle secret | Chỉ qua Match record, sau R-T-11 | Không | Break-glass có audit |
+| Seed lịch bot | Không | Không | Break-glass có audit |
 | Rating Ledger event mình tham gia | Sau R-T-11, kể cả snapshot rating của Opponent | Không | Có |
 | Actor và reason của correction | Chỉ reason category | Không | Có |
 | Skill Estimate log | Không | Không | Có |
-| Queue Entry của chính mình | Có (issue 31 §8) | Không | Có |
+| Queue Entry của chính mình | Có ([Chốt Match lifecycle cho đường Matchmaking Queue](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/31) §8) | Không | Có |
 | Case file | Không | Không | Có |
 | Enforcement record của chính mình | Reason category, case ID, restriction | Không | Có |
-| Telemetry Fact | Không (issue 35 §10) | Không | Có |
-| Security log | Không | Không | Có (issue 12) |
+| Telemetry Fact | Không ([Chốt telemetry tối thiểu để kiểm chứng cân bằng gameplay](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/35) §10) | Không | Có |
+| Security log | Không | Không | Có ([Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12)) |
 
 - **Timeline của cả hai phía.** R-O-03 giao cho ticket này câu hỏi "Clue nào
   Opponent đã mua". Sau R-T-11, mỗi phía đọc được **toàn bộ** Match Timeline của
   cả hai phía, gồm Clue, board lúc Verify, Strike và terminal. Lúc đó secret đã
-  công bố nên không còn gì để lộ, và issue 12 cũng định nghĩa replay là timeline
+  công bố nên không còn gì để lộ, và [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) cũng định nghĩa replay là timeline
   "của cả hai phía". Với Match đấu bot, Player đọc được timeline của Bot Opponent,
-  đúng tinh thần R-BOT-11 và Q13 của issue 25.
+  đúng tinh thần R-BOT-11 và Q13 của [Chốt mô hình đối thủ của Ranked Match](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/25).
 - **Snapshot rating của Opponent.** Ranked Rating là con số public (`CONTEXT.md`),
   nên Player đọc được snapshot của Opponent trong ledger event, nhưng chỉ sau
   R-T-11, vì R-O-01 giới hạn những gì thấy được trong lúc chơi. Ticket này chỉ
@@ -239,11 +241,11 @@ profile, spectator, leaderboard và admin dashboard đều nằm ngoài phạm v
 - **Skill Estimate** không bao giờ hiển thị cho Player (`CONTEXT.md`), nên log của
   nó chỉ operator đọc được.
 - Mọi quyền trong bảng MUST được PostgreSQL kiểm lại. Client không được tự khai
-  `player_id` (issue 12).
+  `player_id` ([Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12)).
 
 ## 8. Tombstone và identity ẩn danh
 
-Issue 2 đã chốt phần lõi của tombstone. Artifact này điền bốn chỗ còn thiếu:
+[Chốt identity, profile và invite-room lifecycle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/2) đã chốt phần lõi của tombstone. Artifact này điền bốn chỗ còn thiếu:
 
 1. **Player Tag** bị xoá cùng display name và lịch sử tên. Lịch sử của Opponent chỉ
    hiện "Người chơi đã xoá". Tag không phải PII, nhưng người quen nhận ra
@@ -264,26 +266,32 @@ hạn sẽ thêm một đường mất quyền truy cập mới, không đảo n
 của
 [Chốt mức bảo đảm khi Player mất quyền truy cập](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/34)
 §3, trong khi lợi ích dung lượng là nhỏ: hàng Player rất nhẹ, còn Match record của
-họ vẫn vĩnh viễn. Dung lượng của chúng do issue 16 theo dõi như mọi quota khác.
+họ vẫn vĩnh viễn. Dung lượng của chúng do [Chốt quality gate, zero-cost operations và release criteria](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/16) theo dõi như mọi quota khác.
 
 ## 9. Rating Ledger và Skill Estimate log
 
-Rating Ledger giữ đúng định nghĩa của `CONTEXT.md` và issue 15 §11: mọi Rating
+Rating Ledger giữ đúng định nghĩa của `CONTEXT.md` và [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §11: mọi Rating
 Settlement và mọi correction, không gì khác.
 
 Skill Estimate quyết định trực tiếp Ranked Rating mở đầu (`Ranked Rating := Skill
-Estimate`, issue 15 §5), nhưng ledger không ghi nó. Không có gì giải thích được
-một opening rating cụ thể. Vì vậy:
+Estimate`, [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §5). Rating Ledger chỉ ghi con số đó như một snapshot, không ghi
+vì sao nó ra con số đó. Vì vậy:
 
-- Mỗi lần Skill Estimate đổi MUST append một event vào **Skill Estimate log**, tách
-  khỏi Rating Ledger. Event gồm `match_id`, Rating Generation, giá trị trước,
-  `K_seed`, delta, giá trị sau, và thời điểm commit.
-- Log này MUST append-only và vĩnh viễn.
-- Seed của Ranked Rating trong một Generation là giá trị cuối cùng của log trong
-  Generation đó. Nhờ vậy phép reconciliation của issue 15 §11 ("seed cộng tổng
-  applied delta") có một điểm neo kiểm chứng được.
-- Event MUST được ghi trong cùng transaction finalization với Practice Match đấu
-  bot đã tạo ra nó.
+- **Skill Estimate log** tách khỏi Rating Ledger, MUST append-only và vĩnh viễn.
+- Mỗi lần Skill Estimate được khởi tạo, log MUST nhận một event khởi tạo: lần đầu
+  ở `1000`, và mỗi khi một Generation mới mở băng nó từ Ranked Rating cuối của
+  Generation trước ([Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §5, §8).
+- Mỗi Practice Match đấu bot mà Skill Estimate nhận làm input MUST append đúng một
+  event, **kể cả khi delta bằng 0**, ví dụ một Draw với `E = 0.5`. Event gồm
+  `match_id`, Rating Generation, giá trị trước, `K_seed`, delta, giá trị sau, và
+  thời điểm commit. Nó MUST được ghi trong cùng transaction finalization với Match
+  đã tạo ra nó.
+- Nhờ hai luật trên, log của một Generation không bao giờ rỗng khi Player đã đủ
+  điều kiện Ranked. Seed của Ranked Rating trong Generation đó là giá trị sau event
+  cuối cùng của log, và MUST bằng snapshot rating của Player trong Rating Ledger
+  event đầu tiên của họ ở Generation đó. Reconciliation của [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §11 ("seed
+  cộng tổng applied delta") vẫn chỉ cần Rating Ledger; log giải thích seed đó từ
+  đâu ra.
 
 ## 10. Match History
 
@@ -292,17 +300,17 @@ Match record vĩnh viễn, cộng Match Timeline khi nó còn hạn.
 
 - **Đọc Match History là đường finalization thứ tư.** Trước khi trả danh sách, nếu
   Match chưa finalize duy nhất của actor đã quá `deadline_at` thì đường đọc MUST
-  gọi đúng hàm finalization mà ba đường của issue 4 đang dùng. Constraint "một
+  gọi đúng hàm finalization mà ba đường của [Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) đang dùng. Constraint "một
   Match chưa finalize cho mỗi Player Identity" bảo đảm việc này tốn tối đa một
-  transaction. Đây là bổ sung, không đổi bất biến nào của issue 4: hàm vẫn là
+  transaction. Đây là bổ sung, không đổi bất biến nào của [Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4): hàm vẫn là
   một, và kết quả vẫn là hàm thuần của `started_at`, các command đã ghi và
   `clock_timestamp()`.
 - Nhờ vậy Match History không bao giờ hiện cho chính người xem một Match "đã hết
   giờ nhưng chưa có kết quả". Match còn trong hạn hiện là đang diễn ra, không kèm
   thông tin nào mà R-O-02 cấm.
-- Match đấu bot MUST hiện rõ là đấu Bot Opponent, không có Player Tag giả (issue 25
+- Match đấu bot MUST hiện rõ là đấu Bot Opponent, không có Player Tag giả ([Chốt mô hình đối thủ của Ranked Match](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/25)
   Q13). Nó vào Match History như mọi Match khác.
-- Match History MUST NOT được dựng từ Balance Telemetry, và ngược lại (issue 35 §2,
+- Match History MUST NOT được dựng từ Balance Telemetry, và ngược lại ([Chốt telemetry tối thiểu để kiểm chứng cân bằng gameplay](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/35) §2,
   §4).
 
 ## 11. Ràng buộc mà PostgreSQL MUST giữ
@@ -313,20 +321,21 @@ khoá tuần tự) thuộc
 [Chọn kiến trúc web và managed services](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/3).
 
 1. Tối đa **một** Match chưa finalize cho mỗi Player Identity, chung cho Room,
-   Matchmaking Queue và Match đấu bot (issue 4 Q10, issue 15 §10).
+   Matchmaking Queue và Match đấu bot ([Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) Q10, [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §10).
 2. Tối đa một Room đang mở cho mỗi Room Owner, và tối đa một Match chưa terminal
-   cho mỗi Room (issue 4 Q10).
+   cho mỗi Room ([Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) Q10).
 3. Tối đa một Queue Entry còn hiệu lực cho mỗi Player, và không bao giờ đồng thời
-   có Queue Entry còn hiệu lực cùng một Match chưa finalize (issue 31 §11).
+   có Queue Entry còn hiệu lực cùng một Match chưa finalize ([Chốt Match lifecycle cho đường Matchmaking Queue](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/31) §11).
 4. Tối đa một Rating Ledger event khởi đầu cho mỗi `match_id`; correction có khoá
-   idempotency và constraint riêng (issue 15 §10–§11).
+   idempotency và constraint riêng ([Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §10–§11).
 5. Finalization ghi kết quả đúng một lần cho mỗi Match và sinh đúng hai Telemetry
-   Fact; chạy lại không ghi thêm gì (issue 4 Q8, issue 35 §2).
+   Fact; chạy lại không ghi thêm gì ([Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) Q8, [Chốt telemetry tối thiểu để kiểm chứng cân bằng gameplay](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/35) §2).
 6. Mỗi Invite Code từng phát là duy nhất trên toàn registry, vĩnh viễn.
-7. `command_id` là duy nhất trong phạm vi dedup của actor (issue 4 Q9).
+7. `command_id` là duy nhất trong phạm vi dedup của actor ([Chốt Match lifecycle, reconnect và concurrency semantics](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/4) Q9).
 8. Một command được chấp nhận và làm đổi state sinh đúng một Match Timeline event.
-9. Rating Ledger, Skill Estimate log, enforcement record và Telemetry Fact không có
-   đường update hay delete nào.
+9. Rating Ledger, Skill Estimate log và enforcement record không có đường update
+   hay delete nào. Telemetry Fact không có đường update nào, và chỉ bị xoá qua cơ
+   chế hết hạn của §5, không bao giờ khi Generation của nó còn hiện hành.
 
 ## 12. Acceptance invariants
 
@@ -338,9 +347,9 @@ Một implementation tuân thủ `digitcode-data-model/1.0.0` MUST thoả:
 3. Không đường đọc nào trả về một hàng đã quá mốc hết hạn của chính nó, bất kể hàng
    đó đã bị xoá vật lý hay chưa.
 4. Sau khi Match Timeline hết hạn, Match record vẫn trả đủ tập R-O-03.
-5. Rating hiện hành trong một Generation bằng giá trị cuối của Skill Estimate log
-   cộng tổng applied delta trong Rating Ledger; mọi sai lệch phát hiện được bằng
-   một truy vấn.
+5. Trong mỗi Generation, snapshot rating của một Player trong Rating Ledger event
+   đầu tiên của họ bằng giá trị sau event cuối của Skill Estimate log trong
+   Generation đó; mọi sai lệch phát hiện được bằng một truy vấn.
 6. Tombstone không xoá hay sửa bất kỳ Match record, Rating Ledger event, Skill
    Estimate log event hay enforcement record nào.
 7. Sau tombstone, không bề mặt nào hiện display name, lịch sử tên, Player Tag hay
@@ -361,7 +370,7 @@ Một implementation tuân thủ `digitcode-data-model/1.0.0` MUST thoả:
 | DDL, kiểu cột, index vật lý, cách biểu diễn ràng buộc §11, transaction và transport, notification row cho Realtime | [Chọn kiến trúc web và managed services](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/3) |
 | Cách trình bày Match History và replay, có vẽ rating của Opponent không, câu chữ "Người chơi đã xoá" | [Prototype trải nghiệm web end-to-end](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/13) |
 | Ngưỡng cảnh báo quota, theo dõi độ trễ xoá vật lý, release criteria | [Chốt quality gate, zero-cost operations và release criteria](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/16) |
-| Rà soát pháp lý của nghĩa vụ xoá dữ liệu và privacy notice; issue 2 giao nghĩa vụ xoá cho cả ticket này lẫn issue 7, hình dạng xoá chốt ở §8 | [Chốt license và attribution policy](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/7) |
+| Rà soát pháp lý của nghĩa vụ xoá dữ liệu và privacy notice; [Chốt identity, profile và invite-room lifecycle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/2) giao nghĩa vụ xoá cho cả ticket này lẫn [Chốt license và attribution policy](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/7), hình dạng xoá chốt ở §8 | [Chốt license và attribution policy](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/7) |
 | Public wording về lưu trữ | [Chốt launch posture cho zero-cost MVP](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/17) |
 | Tập dữ liệu anti-cheat, nấc phạt, security log | [Chốt threat model và anti-cheat boundary](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/12) |
 | Công thức rating, Generation, correction policy | [Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) |
