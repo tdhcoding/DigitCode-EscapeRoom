@@ -9,7 +9,7 @@ A person who participates in a Match, whether or not they have signed up. A Bot 
 _Avoid_: User, competitor, guest
 
 **Player Identity**:
-A durable identity under which the system associates a Player with their Ranked Rating, Skill Estimate, and Match history. It is independent of any browser session, device, connection, or sign-in method.
+A durable identity under which the system associates a Player with their Ranked Rating, Skill Estimate, and Match History. It is independent of any browser session, device, connection, or sign-in method.
 _Avoid_: Account, user, session, provider identity
 
 **Linked Identity**:
@@ -19,6 +19,10 @@ _Avoid_: Provider, login, recovery code
 **Self-recovery**:
 Regaining access to the same Player Identity by authenticating with an accessible Linked Identity, without operator intervention, manual identity proof, Player Identity merging, or database restoration.
 _Avoid_: Account recovery, restore, merge
+
+**Tombstone**:
+The state of a Player Identity whose Player asked for it to be deleted: everything that identifies the person is removed, while the Match results and Ranked Rating changes they took part in remain.
+_Avoid_: Account deletion, hard delete, deactivation
 
 **Puzzle**:
 A secret six-digit code together with the clue facts derived from it. Both sides of a Match receive the same Puzzle.
@@ -74,11 +78,19 @@ _Avoid_: Rating update, payout, finalization
 
 **Rating Ledger**:
 The permanent record of every Rating Settlement and every correction to one. Nothing already recorded is ever rewritten, and a Ranked Rating can be rebuilt from it.
-_Avoid_: Rating history, audit log, Match history
+_Avoid_: Rating history, audit log, Match History
 
 **Balance Telemetry**:
-The non-identifying record kept for one purpose only: checking that the Ruleset and Bot Opponent calibration behave as decided. It is not Match history, not anti-cheat evidence, not product analytics, and not vendor-quota monitoring.
-_Avoid_: Analytics, metrics, logging, Match history
+The non-identifying record kept for one purpose only: checking that the Ruleset and Bot Opponent calibration behave as decided. It is not Match History, not anti-cheat evidence, not product analytics, and not vendor-quota monitoring.
+_Avoid_: Analytics, metrics, logging, Match History
+
+**Match History**:
+What a Player can read back about the Matches they took part in: the final result of each Match, kept permanently, and its Match Timeline for as long as that is kept. It is neither the Rating Ledger nor Balance Telemetry.
+_Avoid_: Game log, rating history, replay
+
+**Match Timeline**:
+The ordered record of every accepted action by both sides of one Match. A Player in that Match can read it only after the Match ends and only for a limited time; no other Player can read it at all.
+_Avoid_: Replay, full replay, log, event stream
 
 **Solve**:
 A successful answer to the Puzzle: a Player produces it through Verify, and a Bot Opponent through Bot Submission. A Solve finishes that side's attempt but does not by itself determine the Match winner.
@@ -97,7 +109,7 @@ A Match that follows the same game rules as a Ranked Match, except that it draws
 _Avoid_: Casual game, friendly room
 
 **Production MVP**:
-The first publicly deployable web release with sign-in, online Matches, reconnect-safe results, Match history, and Ranked Ratings.
+The first publicly deployable web release with sign-in, online Matches, reconnect-safe results, Match History, and Ranked Ratings.
 _Avoid_: Prototype, demo
 
 **Live Beta**:
