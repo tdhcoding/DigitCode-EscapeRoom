@@ -248,8 +248,8 @@ spectator, leaderboard và admin dashboard đều nằm ngoài phạm vi của m
 [Chốt identity, profile và invite-room lifecycle](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/2) đã chốt phần lõi của tombstone. Artifact này điền bốn chỗ còn thiếu:
 
 1. **Player Tag** bị xoá cùng display name và lịch sử tên. Lịch sử của Opponent chỉ
-   hiện "Người chơi đã xoá". Tag không phải PII, nhưng người quen nhận ra
-   "#4821 đã xoá" là ai.
+   hiện "Người chơi đã xoá". Tag không phải PII, nhưng người quen vẫn nhận ra một
+   Tag đi kèm nhãn đó là của ai.
 2. **Phần timeline của người bị xoá** không bị đụng tới và tự hết hạn sau 90 ngày.
    Nó không chứa PII, và Opponent có quyền xem replay theo §7.
 3. **Ranked Rating và Skill Estimate** được giữ, vì ledger phải reconcile được với
@@ -278,14 +278,17 @@ Estimate`, [Chốt chính sách Elo và result integrity](https://github.com/tdh
 vì sao nó ra con số đó. Vì vậy:
 
 - **Skill Estimate log** tách khỏi Rating Ledger, MUST append-only và vĩnh viễn.
-- Mỗi lần Skill Estimate được khởi tạo, log MUST nhận một event khởi tạo: lần đầu
-  ở `1000`, và mỗi khi một Generation mới mở băng nó từ Ranked Rating cuối của
-  Generation trước ([Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §5, §8).
-- Mỗi Practice Match đấu bot mà Skill Estimate nhận làm input MUST append đúng một
-  event, **kể cả khi delta bằng 0**, ví dụ một Draw với `E = 0.5`. Event gồm
-  `match_id`, Rating Generation, giá trị trước, `K_seed`, delta, giá trị sau, và
-  thời điểm commit. Nó MUST được ghi trong cùng transaction finalization với Match
-  đã tạo ra nó.
+- Log có đúng hai loại event. **Event khởi tạo** không có `match_id` và không có
+  giá trị trước; nó mang Rating Generation, giá trị khởi tạo, nguồn của giá trị đó
+  (mốc `1000`, hoặc Ranked Rating cuối của Player ở Generation trước) và thời điểm
+  commit. Nó MUST được ghi mỗi khi Skill Estimate được khởi tạo: lần đầu ở `1000`,
+  và mỗi khi một Generation mới mở băng nó từ Ranked Rating cuối của Generation
+  trước ([Chốt chính sách Elo và result integrity](https://github.com/tdhcoding/DigitCode-EscapeRoom/issues/15) §5, §8).
+- **Event Match** mang `match_id`, Rating Generation, giá trị trước, `K_seed`,
+  delta, giá trị sau và thời điểm commit. Mỗi Practice Match đấu bot mà Skill
+  Estimate nhận làm input MUST append đúng một event Match, **kể cả khi delta bằng
+  0**, ví dụ một Draw với `E = 0.5`. Nó MUST được ghi trong cùng transaction
+  finalization với Match đã tạo ra nó.
 - Nhờ hai luật trên, log của một Generation không bao giờ rỗng khi Player đã đủ
   điều kiện Ranked. Seed của Ranked Rating trong Generation đó là giá trị sau event
   cuối cùng của log, và MUST bằng snapshot rating của Player trong Rating Ledger
